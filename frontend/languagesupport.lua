@@ -68,7 +68,8 @@ corresponding onHandler method):
    } table as the only argument.
 
    Must return the new (pos0, pos1) XPointers or nil if the word couldn't be
-   expanded.
+   expanded. An optional third value overrides the selected text (for
+   instance to leave out ruby annotations inside the range).
 
  - WordLookup (onWordLookup) is called when a dictionary lookup is triggered on
    some text and can be used to adjust the word such that it is in the
@@ -193,7 +194,7 @@ function LanguageSupport:improveWordSelection(selection)
         return
     end
 
-    local new_pos0, new_pos1 = unpack(self:_findAndCallPlugin(
+    local new_pos0, new_pos1, new_text_override = unpack(self:_findAndCallPlugin(
         language_code, "WordSelection",
         { text = selection.text, pos0 = selection.pos0, pos1 = selection.pos1, callbacks = callbacks }
     ) or {})
@@ -223,7 +224,7 @@ function LanguageSupport:improveWordSelection(selection)
     end
 
     return {
-        text = util.cleanupSelectedText(new_text),
+        text = new_text_override or util.cleanupSelectedText(new_text),
         pos0 = new_pos0,
         pos1 = new_pos1,
         sboxes = self.document:getScreenBoxesFromPositions(new_pos0, new_pos1, true),

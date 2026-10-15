@@ -198,6 +198,14 @@ function ReaderDictionary:addToDictButtons(spec)
     self._dict_buttons[spec.id] = spec
 end
 
+--- Let a plugin handle lookups instead of sdcv.
+-- backend:canLookup(word) -> bool decides per word; backend:lookup(word) must
+-- return a non-empty DictQuickLookup results array (definitions already
+-- formatted, with is_html/css/dictionary_resource_directory set as needed).
+function ReaderDictionary:setLookupBackend(backend)
+    self.lookup_backend = backend
+end
+
 -- function ReaderDictionary:registerKeyEvents()
 --     Now handled by hotkeys.koplugin:
 --     onShowDictionaryLookup = { { "Alt", "D" }, { "Ctrl", "D" } }
@@ -1448,6 +1456,14 @@ function ReaderDictionary:stardictLookup(word, dict_names, fuzzy_search, boxes, 
                 dict_close_callback()
             end
         end)
+        return
+    end
+
+    -- A lookup backend registered by a plugin (e.g. yomitan.koplugin) can take
+    -- over lookups it handles; its results are already formatted for DictQuickLookup.
+    if self.lookup_backend and self.lookup_backend:canLookup(word) then
+        self:showLookupInfo(word, self.lookup_msg_delay)
+        self:showDict(word, self.lookup_backend:lookup(word), boxes, link, dict_close_callback)
         return
     end
 
