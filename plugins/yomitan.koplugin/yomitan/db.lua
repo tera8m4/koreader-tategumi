@@ -145,7 +145,7 @@ end
 
 --- Find rows whose expression (index_index 0) or reading (index_index 1)
 -- equals one of `terms`. Each row carries `item_index`, the 1-based index of
--- the matching term, and its glossary as JSON text (`glossary`).
+-- the matching term; its glossary is read with getGlossary(row).
 function Dictionary:findTermsBulk(terms)
     local index_of = {}
     for i, term in ipairs(terms) do
@@ -180,10 +180,12 @@ function Dictionary:findTermsBulk(terms)
             stmt:clearbind()
         end
     end
-    for _, r in ipairs(results) do
-        r.glossary = self:_getBlock(r.glossary_block)[r.glossary_index + 1] or "[]"
-    end
     return results
+end
+
+--- The glossary of a row from findTermsBulk(), as JSON text.
+function Dictionary:getGlossary(row)
+    return self:_getBlock(row.glossary_block)[row.glossary_index + 1] or "[]"
 end
 
 --- First tag row named `name`, as Yomitan's findTagMetaBulk returns.

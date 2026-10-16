@@ -58,6 +58,7 @@ nix develop --command ./kodev check
 - `kodev`, `Makefile`, `flake.nix`: developer CLI, build targets, and Nix environment.
 - `AGENTS.md`: repository architecture, development commands, and fork-specific contribution guidance.
 - `plugins/yomitan.koplugin/`, `tools/yomitan_convert.py`, `tools/yomitan/`: fork-specific Yomitan port (Japanese scanning, deinflection, dictionary format); see the plugin README. Hooks into upstream code are `ReaderDictionary:setLookupBackend` and the optional selected-text return value of LanguageSupport `onWordSelection`.
+- `plugins/bookwords.koplugin/`: fork-specific per-book list of looked-up words, marked on the page (ReaderView view module) with optional furigana; replaces upstream's Vocabulary Builder, which this fork removes. Uses the Yomitan plugin's `getTopEntry`/`matchAt` when present.
 
 ## Runtime/Tooling Preferences
 

@@ -1,11 +1,13 @@
 <#
-Converts Yomitan dictionaries and copies them, with plugins/yomitan.koplugin, to
+Converts Yomitan dictionaries and copies them, with plugins/yomitan.koplugin and
+plugins/bookwords.koplugin, to
 KOReader on a Kindle connected over USB as an MTP device:
 
   powershell -ExecutionPolicy Bypass -File tools\yomitan_install.ps1 [-DryRun] [dict.zip ...]
 
-With no dictionaries given, asks for them (Enter alone = only update the plugin).
-Lands in <KOReader>/plugins/yomitan.koplugin and <KOReader>/data/yomitan/<dictionary>.
+With no dictionaries given, asks for them (Enter alone = only update the plugins).
+Lands in <KOReader>/plugins/{yomitan,bookwords}.koplugin and <KOReader>/data/yomitan/<dictionary>.
+Also removes plugins/vocabbuilder.koplugin, which this fork no longer ships.
 #>
 [CmdletBinding(PositionalBinding = $false)]
 param(
@@ -155,8 +157,18 @@ try
 	}
 
 	Write-Host "==> Copying"
-	$plugin = Get-OrCreateFolder (Get-OrCreateFolder $ko 'plugins' 'plugins') 'yomitan.koplugin' 'plugins/yomitan.koplugin'
-	Sync-Folder (Join-Path $repo 'plugins\yomitan.koplugin') $plugin 'plugins/yomitan.koplugin'
+	$plugins = Get-OrCreateFolder $ko 'plugins' 'plugins'
+	foreach ($name in @('yomitan.koplugin', 'bookwords.koplugin'))
+	{
+		$plugin = Get-OrCreateFolder $plugins $name "plugins/$name"
+		Sync-Folder (Join-Path $repo "plugins\$name") $plugin "plugins/$name"
+	}
+	$vocab = if ($plugins) { Find-Child $plugins 'vocabbuilder.koplugin' } else { $null }
+	if ($vocab)
+	{
+		Write-Host "    remove  plugins/vocabbuilder.koplugin"
+		if (-not $DryRun) { Remove-FromDevice $vocab $plugins 'vocabbuilder.koplugin' 'plugins/vocabbuilder.koplugin' }
+	}
 	if ($Dictionaries)
 	{
 		$data = Get-OrCreateFolder (Get-OrCreateFolder $ko 'data' 'data') 'yomitan' 'data/yomitan'

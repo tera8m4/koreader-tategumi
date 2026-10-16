@@ -206,7 +206,7 @@ local order = {
         "----------------------------",
         "dictionary_lookup",
         "dictionary_lookup_history",
-        "vocabbuilder",
+        "bookwords",
         "----------------------------",
         "wikipedia_lookup",
         "wikipedia_history",

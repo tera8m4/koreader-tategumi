@@ -153,7 +153,6 @@ local order = {
         "----------------------------",
         "dictionary_lookup",
         "dictionary_lookup_history",
-        "vocabbuilder",
         "----------------------------",
         "wikipedia_lookup",
         "wikipedia_history",

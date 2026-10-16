@@ -359,6 +359,49 @@ function Yomitan:onWordSelection(args)
     return {args.pos0, end_positions[length], selected}
 end
 
+-- Public API, used by bookwords.koplugin
+
+--- Term and reading of the top entry for `text` (the dictionary form of the
+-- word a lookup of `text` shows first).
+function Yomitan:getTopEntry(text)
+    if not self:isActive() then return end
+    local result
+    if self.cache and self.cache.text == text then
+        result = self.cache.result
+    else
+        result = self:findTerms(text)
+        self.cache = { text = text, result = result } -- for the lookup that follows
+    end
+    local entry = result.entries[1]
+    local headword = entry and entry.headwords[1]
+    if headword then
+        return headword.term, headword.reading
+    end
+end
+
+--- What a lookup at the start of `text` would match, cheaply (glossaries are
+-- not read). Returns the match length in characters and the {term, reading}
+-- of the entries of that length.
+function Yomitan:matchAt(text)
+    if not self:isActive() then return end
+    local result = self.translator:findTerms(text, {
+        mode = self.settings.result_mode,
+        remove_non_japanese = false,
+        match_only = true,
+    })
+    local length = result.original_text_length
+    if length == 0 then return end
+    local words = {}
+    for _, entry in ipairs(result.entries) do
+        if entry.max_original_text_length == length then
+            for _, headword in ipairs(entry.headwords) do
+                table.insert(words, { term = headword.term, reading = headword.reading })
+            end
+        end
+    end
+    return length, words
+end
+
 -- Lookup backend (see ReaderDictionary:setLookupBackend)
 
 --- The HTML entry of a result from buildResults(), built on first use.

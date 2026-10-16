@@ -302,7 +302,12 @@ function Translator:_findTermsBulk(terms)
             visited[id] = true
             local definitions = row.definitions
             if definitions == nil then
-                definitions = self.json_decode(row.glossary)
+                if self._match_only then
+                    -- Matching only: skip reading the glossary.
+                    definitions = { "" }
+                else
+                    definitions = self.json_decode(c.dict:getGlossary(row))
+                end
             end
             table.insert(results, {
                 index = row.item_index,
@@ -931,10 +936,24 @@ end
 
 --- Find terms for the text starting at the scanned position.
 -- @tparam string text up to scan-length characters of document text
--- @tparam table options {mode = "group"|"term"|"split", deinflect = bool, remove_non_japanese = bool}
+-- @tparam table options {mode = "group"|"term"|"split", deinflect = bool, remove_non_japanese = bool,
+--   match_only = bool}; with match_only, glossaries are not read (definitions are placeholders,
+--   dictionary-provided deinflections are not applied) and entries are neither sorted nor tagged:
+--   only the matched terms and lengths are meaningful.
 -- @treturn table {entries = {...}, original_text_length = number (characters)}
 function Translator:findTerms(text, options)
     options = options or {}
+    if options.match_only then
+        self._match_only = true
+        local ok, result = pcall(self._findTerms, self, text, options)
+        self._match_only = nil
+        if not ok then error(result, 0) end
+        return result
+    end
+    return self:_findTerms(text, options)
+end
+
+function Translator:_findTerms(text, options)
     local mode = options.mode or "group"
     if options.remove_non_japanese then
         text = Japanese.getCJKOnlyText(text)
@@ -951,6 +970,9 @@ function Translator:findTerms(text, options)
         dictionary_entries = groupDictionaryEntries(dictionary_entries, tag_aggregator, true)
     elseif mode == "term" then
         dictionary_entries = groupDictionaryEntries(dictionary_entries, tag_aggregator, false)
+    end
+    if options.match_only then
+        return { entries = dictionary_entries, original_text_length = original_text_length }
     end
 
     self:_expandTagGroupsAndGroup(tag_aggregator:getTagExpansionTargets())

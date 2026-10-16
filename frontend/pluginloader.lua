@@ -59,7 +59,6 @@ local BUILTIN_PLUGINS = {
     ["terminal"] = true,
     ["texteditor"] = true,
     ["timesync"] = true,
-    ["vocabbuilder"] = true,
     ["wallabag"] = true,
 }
 
