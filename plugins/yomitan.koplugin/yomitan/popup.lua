@@ -31,6 +31,7 @@ local Popup = InputContainer:extend{
     results = nil, -- DictQuickLookup results with yomitan_short set
     word_boxes = nil, -- screen boxes of the looked-up word
     index = 1,
+    refresh_type = "ui", -- "fast": quickest black-and-white e-ink refresh
     on_full = nil, -- function(index): open the full window
     on_close = nil, -- function()
     on_tap_outside = nil, -- function(ges): after closing on a tap elsewhere
@@ -161,7 +162,7 @@ function Popup:getVisibleArea()
 end
 
 function Popup:show()
-    UIManager:show(self, "ui", self.frame_dimen)
+    UIManager:show(self, self.refresh_type, self.frame_dimen)
 end
 
 function Popup:changeResult(index)
@@ -170,7 +171,7 @@ function Popup:changeResult(index)
     self.index = index
     self:build()
     -- Repaint everything under both the old and the new popup.
-    UIManager:setDirty("all", "ui", old:combine(self.frame_dimen))
+    UIManager:setDirty("all", self.refresh_type, old:combine(self.frame_dimen))
     return true
 end
 
@@ -178,7 +179,7 @@ function Popup:onNext() return self:changeResult(self.index + 1) end
 function Popup:onPrev() return self:changeResult(self.index - 1) end
 
 function Popup:close()
-    UIManager:close(self, "ui", self.frame_dimen)
+    UIManager:close(self, self.refresh_type, self.frame_dimen)
     if self.on_close then self.on_close() end
 end
 

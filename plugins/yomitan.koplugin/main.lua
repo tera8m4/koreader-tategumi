@@ -35,6 +35,8 @@ local Scanner = require("yomitan/scanner")
 local Text = require("yomitan/text")
 local Translator = require("yomitan/translator")
 
+local fullDefinition -- defined below
+
 local DEFAULT_SCAN_LENGTH = 16 -- Yomitan's default scanning.length
 local SETTINGS_KEY = "yomitan"
 
@@ -62,6 +64,7 @@ function Yomitan:readSettings()
     if settings.tap_lookup == nil then settings.tap_lookup = true end
     if settings.short_view == nil then settings.short_view = true end
     if settings.mini_popup == nil then settings.mini_popup = true end
+    if settings.fast_refresh == nil then settings.fast_refresh = true end
     Compat.no_flash = settings.no_flash
     self.settings = settings
 end
@@ -176,6 +179,7 @@ function Yomitan:showPopup(rd, word, results, boxes, link, dict_close_callback, 
     local highlight = rd.highlight
     local opening_full = false
     Popup:new{
+        refresh_type = self.settings.fast_refresh and "fast" or "ui",
         results = results,
         word_boxes = boxes,
         on_full = function(index)
@@ -184,7 +188,7 @@ function Yomitan:showPopup(rd, word, results, boxes, link, dict_close_callback, 
             for i, r in ipairs(results) do
                 local copy = {}
                 for k, v in pairs(r) do copy[k] = v end
-                copy.definition, copy.is_html = r.yomitan_full, true
+                copy.definition, copy.is_html = fullDefinition(r), true
                 full[i] = copy
             end
             show_full(rd, word, full, boxes, link, dict_close_callback)
@@ -301,15 +305,15 @@ function Yomitan:addToggleButton()
         text = _("Full / short"),
         show_func = function(dql)
             local r = dql.results and dql.results[1]
-            return r ~= nil and r.yomitan_full ~= nil
+            return r ~= nil and r.yomitan_short ~= nil
         end,
         callback = function(dql)
             local r = dql.results[dql.dict_index]
-            if not (r and r.yomitan_full) then return end
+            if not (r and r.yomitan_short) then return end
             if r.is_html then
                 r.definition, r.is_html = r.yomitan_short, false
             else
-                r.definition, r.is_html = r.yomitan_full, true
+                r.definition, r.is_html = fullDefinition(r), true
             end
             dql:changeDictionary(dql.dict_index)
         end,
@@ -357,6 +361,14 @@ end
 
 -- Lookup backend (see ReaderDictionary:setLookupBackend)
 
+--- The HTML entry of a result from buildResults(), built on first use.
+fullDefinition = function(result)
+    if not result.yomitan_full then
+        result.yomitan_full = Html.entryForDictionary(result.yomitan_entry, result.dict)
+    end
+    return result.yomitan_full
+end
+
 function Yomitan:canLookup(word)
     return self:isActive() and type(word) == "string" and Japanese.isStringPartiallyJapanese(word)
 end
@@ -378,17 +390,18 @@ function Yomitan:buildResults(word, entries)
                 local result = {
                     dict = title,
                     word = headword,
-                    definition = Html.entryForDictionary(entry, title),
-                    is_html = true,
                     css = Html.BASE_CSS .. (dict and dict.styles or ""),
                     dictionary_resource_directory = dict and dict.dir,
                     ifo_lang = { lang_in = "ja", lang_out = dict and dict.meta.targetLanguage },
+                    yomitan_entry = entry,
+                    yomitan_short = Text.entryForDictionary(entry, title),
                 }
-                result.yomitan_full = result.definition
-                result.yomitan_short = Text.entryForDictionary(entry, title)
-                if self.can_toggle and self.settings.short_view then
-                    -- Plain text shows up much faster than HTML.
+                if self.settings.mini_popup or (self.can_toggle and self.settings.short_view) then
+                    -- Plain text shows up much faster than HTML, which is
+                    -- only built when asked for (fullDefinition()).
                     result.definition, result.is_html = result.yomitan_short, false
+                else
+                    result.definition, result.is_html = fullDefinition(result), true
                 end
                 table.insert(results, result)
             end
@@ -530,6 +543,16 @@ function Yomitan:addToMainMenu(menu_items)
                 checked_func = function() return self.settings.mini_popup end,
                 callback = function()
                     self.settings.mini_popup = not self.settings.mini_popup
+                    self:saveSettings()
+                end,
+            },
+            {
+                text = _("Fast popup refresh"),
+                help_text = _("Draw the compact popup with the fastest black-and-white e-ink refresh. Text edges look slightly rougher and faint ghosting may remain until the next full refresh."),
+                enabled_func = function() return self.settings.mini_popup end,
+                checked_func = function() return self.settings.fast_refresh end,
+                callback = function()
+                    self.settings.fast_refresh = not self.settings.fast_refresh
                     self:saveSettings()
                 end,
             },
