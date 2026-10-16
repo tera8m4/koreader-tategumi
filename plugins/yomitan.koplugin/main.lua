@@ -60,6 +60,7 @@ function Yomitan:readSettings()
     if settings.no_flash == nil then settings.no_flash = true end
     if settings.tap_lookup == nil then settings.tap_lookup = true end
     if settings.short_view == nil then settings.short_view = true end
+    if settings.mini_popup == nil then settings.mini_popup = true end
     Compat.no_flash = settings.no_flash
     self.settings = settings
 end
@@ -151,7 +152,67 @@ function Yomitan:updateRegistration()
     end
 end
 
+--- Show Yomitan results in the compact popup (see yomitan/popup.lua).
+-- Installed before Compat, whose showDict() wrapper must run first.
+local function installPopupHook()
+    local ReaderDictionary = require("apps/reader/modules/readerdictionary")
+    if ReaderDictionary._yomitan_popup_hook then return end
+    ReaderDictionary._yomitan_popup_hook = true
+    local orig_showDict = ReaderDictionary.showDict
+    ReaderDictionary.showDict = function(rd, word, results, boxes, link, dict_close_callback)
+        local backend = rd.lookup_backend
+        if backend and backend.settings and backend.settings.mini_popup
+                and results and results[1] and results[1].yomitan_short then
+            return backend:showPopup(rd, word, results, boxes, link, dict_close_callback, orig_showDict)
+        end
+        return orig_showDict(rd, word, results, boxes, link, dict_close_callback)
+    end
+end
+
+function Yomitan:showPopup(rd, word, results, boxes, link, dict_close_callback, show_full)
+    rd:dismissLookupInfo()
+    local Popup = require("yomitan/popup")
+    local highlight = rd.highlight
+    local opening_full = false
+    Popup:new{
+        results = results,
+        word_boxes = boxes,
+        on_full = function(index)
+            opening_full = true
+            local full = {}
+            for i, r in ipairs(results) do
+                local copy = {}
+                for k, v in pairs(r) do copy[k] = v end
+                copy.definition, copy.is_html = r.yomitan_full, true
+                full[i] = copy
+            end
+            show_full(rd, word, full, boxes, link, dict_close_callback)
+            if index > 1 and rd.dict_window then
+                rd.dict_window:changeDictionary(index)
+            end
+        end,
+        on_close = function()
+            if opening_full then return end
+            if highlight then
+                -- Like DictQuickLookup: keep the word highlighted for a moment.
+                local clear_id = highlight:getClearId()
+                UIManager:scheduleIn(G_defaults:readSetting("DELAY_CLEAR_HIGHLIGHT_S"), function()
+                    highlight:clear(clear_id)
+                end)
+            end
+            if dict_close_callback then dict_close_callback() end
+        end,
+        on_tap_outside = function(ges)
+            -- Tapping another word looks it up straight away.
+            if self.settings.tap_lookup and self.ui.highlight then
+                self:onTapLookup(ges)
+            end
+        end,
+    }:show()
+end
+
 function Yomitan:init()
+    installPopupHook()
     -- Install the hooks ourselves on builds that do not provide them.
     Compat.install()
     self:readSettings()
@@ -171,6 +232,7 @@ function Yomitan:onReaderReady()
         if not self:isActive() then return end
         local ok, result = pcall(self.findTerms, self, "食べさせられた")
         if ok then pcall(self.buildResults, self, "", result.entries) end
+        require("yomitan/popup")
     end)
 end
 
@@ -314,13 +376,11 @@ function Yomitan:buildResults(word, entries)
                     dictionary_resource_directory = dict and dict.dir,
                     ifo_lang = { lang_in = "ja", lang_out = dict and dict.meta.targetLanguage },
                 }
-                if self.can_toggle then
+                result.yomitan_full = result.definition
+                result.yomitan_short = Text.entryForDictionary(entry, title)
+                if self.can_toggle and self.settings.short_view then
                     -- Plain text shows up much faster than HTML.
-                    result.yomitan_full = result.definition
-                    result.yomitan_short = Text.entryForDictionary(entry, title)
-                    if self.settings.short_view then
-                        result.definition, result.is_html = result.yomitan_short, false
-                    end
+                    result.definition, result.is_html = result.yomitan_short, false
                 end
                 table.insert(results, result)
             end
@@ -455,6 +515,15 @@ function Yomitan:addToMainMenu(menu_items)
             {
                 text = _("Result grouping"),
                 sub_item_table = mode_items,
+            },
+            {
+                text = _("Compact popup"),
+                help_text = _("Show lookups in a small popup with short definitions, which opens faster. Its \"Full\" button opens the regular dictionary window."),
+                checked_func = function() return self.settings.mini_popup end,
+                callback = function()
+                    self.settings.mini_popup = not self.settings.mini_popup
+                    self:saveSettings()
+                end,
             },
             {
                 text = _("Tap to look up"),
