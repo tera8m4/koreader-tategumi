@@ -16,6 +16,7 @@ On builds without these hooks, yomitan/compat.lua installs equivalents.
 ]]
 
 local DataStorage = require("datastorage")
+local Device = require("device")
 local LanguageSupport = require("languagesupport")
 local UIManager = require("ui/uimanager")
 local WidgetContainer = require("ui/widget/container/widgetcontainer")
@@ -30,6 +31,7 @@ local Dictionary = require("yomitan/db")
 local Html = require("yomitan/html")
 local Japanese = require("yomitan/japanese")
 local Scanner = require("yomitan/scanner")
+local Text = require("yomitan/text")
 local Translator = require("yomitan/translator")
 
 local DEFAULT_SCAN_LENGTH = 16 -- Yomitan's default scanning.length
@@ -56,6 +58,8 @@ function Yomitan:readSettings()
     settings.scan_length = settings.scan_length or DEFAULT_SCAN_LENGTH
     settings.result_mode = settings.result_mode or "group"
     if settings.no_flash == nil then settings.no_flash = true end
+    if settings.tap_lookup == nil then settings.tap_lookup = true end
+    if settings.short_view == nil then settings.short_view = true end
     Compat.no_flash = settings.no_flash
     self.settings = settings
 end
@@ -156,6 +160,88 @@ function Yomitan:init()
     if self.ui and self.ui.menu then
         self.ui.menu:registerToMainMenu(self)
     end
+    self:addToggleButton()
+end
+
+function Yomitan:onReaderReady()
+    self:setupTapLookup()
+    -- Open the databases and run the lookup code once, so that the first
+    -- real lookup is as quick as the following ones.
+    UIManager:scheduleIn(1, function()
+        if not self:isActive() then return end
+        local ok, result = pcall(self.findTerms, self, "食べさせられた")
+        if ok then pcall(self.buildResults, self, "", result.entries) end
+    end)
+end
+
+--- Tap on Japanese text to look it up, like a long-press. Taps elsewhere,
+-- and taps on links, highlights, menus and corners, work as before.
+function Yomitan:setupTapLookup()
+    local ui = self.ui
+    if not (ui.rolling and ui.highlight and ui.touch_zone_dg and Device:isTouchDevice()) then return end
+    ui:registerTouchZones({
+        {
+            id = "yomitan_tap_lookup",
+            ges = "tap",
+            screen_zone = { ratio_x = 0, ratio_y = 0, ratio_w = 1, ratio_h = 1 },
+            overrides = { "tap_forward", "tap_backward" },
+            handler = function(ges) return self:onTapLookup(ges) end,
+        },
+    })
+    -- Let these zones go first.
+    for _, id in ipairs({ "tap_link", "readerhighlight_tap", "readerhighlight_tap_select_mode",
+            "readermenu_tap", "readermenu_ext_tap", "readerconfigmenu_tap", "readerconfigmenu_ext_tap",
+            "readerfooter_tap", "tap_top_left_corner", "tap_top_right_corner",
+            "tap_left_bottom_corner", "tap_right_bottom_corner" }) do
+        if ui._zones[id] then
+            ui.touch_zone_dg:addNodeDep("yomitan_tap_lookup", id)
+        end
+    end
+    ui._ordered_touch_zones = {}
+    for _, zone_id in ipairs(ui.touch_zone_dg:serialize()) do
+        table.insert(ui._ordered_touch_zones, ui._zones[zone_id])
+    end
+end
+
+function Yomitan:onTapLookup(ges)
+    if not (self.settings.tap_lookup and self:isActive()) then return end
+    local highlight = self.ui.highlight
+    if highlight.select_mode or highlight.hold_pos then return end
+    local pos = self.ui.view:screenToPageTransform(ges.pos)
+    if not pos then return end
+    local ok, word = pcall(self.ui.document.getWordFromPosition, self.ui.document, pos, true)
+    if not (ok and word and type(word.word) == "string" and Japanese.isStringPartiallyJapanese(word.word)) then
+        return
+    end
+    highlight:onHold(nil, ges)
+    local selected = highlight.selected_text ~= nil
+    highlight:onHoldRelease()
+    return selected
+end
+
+--- A popup button switching between the short and the full entry.
+function Yomitan:addToggleButton()
+    local dictionary = self.ui and self.ui.dictionary
+    self.can_toggle = dictionary and dictionary.addToDictButtons ~= nil
+    if not self.can_toggle then return end
+    dictionary:addToDictButtons{
+        id = "yomitan_toggle_view",
+        text = _("Full / short"),
+        show_func = function(dql)
+            local r = dql.results and dql.results[1]
+            return r ~= nil and r.yomitan_full ~= nil
+        end,
+        callback = function(dql)
+            local r = dql.results[dql.dict_index]
+            if not (r and r.yomitan_full) then return end
+            if r.is_html then
+                r.definition, r.is_html = r.yomitan_short, false
+            else
+                r.definition, r.is_html = r.yomitan_full, true
+            end
+            dql:changeDictionary(dql.dict_index)
+        end,
+    }
 end
 
 function Yomitan:supportsLanguage(language_code)
@@ -217,7 +303,7 @@ function Yomitan:buildResults(word, entries)
             if not seen[title] then
                 seen[title] = true
                 local dict = by_title[title]
-                table.insert(results, {
+                local result = {
                     dict = title,
                     word = headword,
                     definition = Html.entryForDictionary(entry, title),
@@ -225,7 +311,16 @@ function Yomitan:buildResults(word, entries)
                     css = Html.BASE_CSS .. (dict and dict.styles or ""),
                     dictionary_resource_directory = dict and dict.dir,
                     ifo_lang = { lang_in = "ja", lang_out = dict and dict.meta.targetLanguage },
-                })
+                }
+                if self.can_toggle then
+                    -- Plain text shows up much faster than HTML.
+                    result.yomitan_full = result.definition
+                    result.yomitan_short = Text.entryForDictionary(entry, title)
+                    if self.settings.short_view then
+                        result.definition, result.is_html = result.yomitan_short, false
+                    end
+                end
+                table.insert(results, result)
             end
         end
     end
@@ -358,6 +453,25 @@ function Yomitan:addToMainMenu(menu_items)
             {
                 text = _("Result grouping"),
                 sub_item_table = mode_items,
+            },
+            {
+                text = _("Tap to look up"),
+                help_text = _("Tap on Japanese text to look it up, as with a long-press. Swipe to turn pages; taps where there is no Japanese text still turn pages."),
+                checked_func = function() return self.settings.tap_lookup end,
+                callback = function()
+                    self.settings.tap_lookup = not self.settings.tap_lookup
+                    self:saveSettings()
+                end,
+            },
+            {
+                text = _("Short definitions first"),
+                help_text = _("Show definitions as plain text without examples and images, which appears faster. The \"Full / short\" button in the popup switches to the full entry."),
+                enabled_func = function() return self.can_toggle end,
+                checked_func = function() return self.settings.short_view end,
+                callback = function()
+                    self.settings.short_view = not self.settings.short_view
+                    self:saveSettings()
+                end,
             },
             {
                 text = _("Open and close popup without flashing"),
