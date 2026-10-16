@@ -17,6 +17,7 @@ On builds without these hooks, yomitan/compat.lua installs equivalents.
 
 local DataStorage = require("datastorage")
 local Device = require("device")
+local Screen = Device.screen
 local LanguageSupport = require("languagesupport")
 local UIManager = require("ui/uimanager")
 local WidgetContainer = require("ui/widget/container/widgetcontainer")
@@ -275,6 +276,13 @@ function Yomitan:onTapLookup(ges)
     if not pos then return end
     local ok, word = pcall(self.ui.document.getWordFromPosition, self.ui.document, pos, true)
     if not (ok and word and type(word.word) == "string" and Japanese.isStringPartiallyJapanese(word.word)) then
+        return
+    end
+    -- crengine returns the nearest word even for taps on empty space:
+    -- only accept taps on the word itself (with a little slack).
+    local box, slack = word.sbox, Screen:scaleBySize(4)
+    if not (box and pos.x >= box.x - slack and pos.x <= box.x + box.w + slack
+            and pos.y >= box.y - slack and pos.y <= box.y + box.h + slack) then
         return
     end
     highlight:onHold(nil, ges)
