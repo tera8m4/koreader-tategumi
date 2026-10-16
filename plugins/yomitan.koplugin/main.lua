@@ -184,13 +184,15 @@ function Yomitan:setupTapLookup()
             id = "yomitan_tap_lookup",
             ges = "tap",
             screen_zone = { ratio_x = 0, ratio_y = 0, ratio_w = 1, ratio_h = 1 },
-            overrides = { "tap_forward", "tap_backward" },
+            -- Text near the top and bottom edges is inside the menu zones:
+            -- a tap on text looks it up, a tap on the margin opens the menu.
+            overrides = { "tap_forward", "tap_backward",
+                "readermenu_tap", "readermenu_ext_tap", "readerconfigmenu_tap", "readerconfigmenu_ext_tap" },
             handler = function(ges) return self:onTapLookup(ges) end,
         },
     })
     -- Let these zones go first.
     for _, id in ipairs({ "tap_link", "readerhighlight_tap", "readerhighlight_tap_select_mode",
-            "readermenu_tap", "readermenu_ext_tap", "readerconfigmenu_tap", "readerconfigmenu_ext_tap",
             "readerfooter_tap", "tap_top_left_corner", "tap_top_right_corner",
             "tap_left_bottom_corner", "tap_right_bottom_corner" }) do
         if ui._zones[id] then
