@@ -55,6 +55,8 @@ function Yomitan:readSettings()
     settings.dicts_disabled = settings.dicts_disabled or {}
     settings.scan_length = settings.scan_length or DEFAULT_SCAN_LENGTH
     settings.result_mode = settings.result_mode or "group"
+    if settings.no_flash == nil then settings.no_flash = true end
+    Compat.no_flash = settings.no_flash
     self.settings = settings
 end
 
@@ -356,6 +358,16 @@ function Yomitan:addToMainMenu(menu_items)
             {
                 text = _("Result grouping"),
                 sub_item_table = mode_items,
+            },
+            {
+                text = _("Open and close popup without flashing"),
+                help_text = _("Uses a faster refresh for the dictionary popup instead of a flashing one. Some ghosting may remain until the next page turn."),
+                checked_func = function() return self.settings.no_flash end,
+                callback = function()
+                    self.settings.no_flash = not self.settings.no_flash
+                    Compat.no_flash = self.settings.no_flash
+                    self:saveSettings()
+                end,
             },
             {
                 text = _("Dictionary information"),

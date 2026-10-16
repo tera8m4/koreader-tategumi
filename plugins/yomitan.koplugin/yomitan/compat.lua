@@ -87,9 +87,49 @@ local function patchLanguageSupport()
     end
 end
 
+--- DictQuickLookup: optionally open and close the popup without the e-ink
+-- flash (a "flashui" refresh of the popup when shown, of the whole screen
+-- when closed), which makes frequent lookups quicker.
+Compat.no_flash = false
+
+local function patchDictQuickLookup()
+    local DictQuickLookup = require("ui/widget/dictquicklookup")
+    local UIManager = require("ui/uimanager")
+    if DictQuickLookup._yomitan_no_flash then
+        return
+    end
+    DictQuickLookup._yomitan_no_flash = true
+
+    local orig_onShow = DictQuickLookup.onShow
+    DictQuickLookup.onShow = function(self)
+        if not Compat.no_flash then return orig_onShow(self) end
+        UIManager:setDirty(self, function()
+            return "ui", self.dict_frame.dimen
+        end)
+        return true
+    end
+
+    local orig_onCloseWidget = DictQuickLookup.onCloseWidget
+    DictQuickLookup.onCloseWidget = function(self)
+        if not Compat.no_flash then return orig_onCloseWidget(self) end
+        -- Turn its full-screen "flashui" into a plain "ui" refresh.
+        local setDirty = UIManager.setDirty
+        UIManager.setDirty = function(um, widget, refreshtype, ...)
+            if widget == nil and type(refreshtype) == "function" then
+                return setDirty(um, nil, function() return "ui", nil end)
+            end
+            return setDirty(um, widget, refreshtype, ...)
+        end
+        local ok, err = pcall(orig_onCloseWidget, self)
+        UIManager.setDirty = setDirty
+        if not ok then error(err, 0) end
+    end
+end
+
 function Compat.install()
     patchReaderDictionary()
     patchLanguageSupport()
+    patchDictQuickLookup()
 end
 
 return Compat
