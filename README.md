@@ -2,11 +2,14 @@
 
 **English** | [日本語](#日本語)
 
-**KOReader fork for Japanese vertical text (縦書き) and right-to-left manga.**
+**KOReader fork for Japanese vertical text (縦書き), right-to-left manga, and
+Yomitan dictionary lookups.**
 
 This is a personal fork of [KOReader](https://github.com/koreader/koreader) for
 Japanese books. It adds `writing-mode: vertical-rl` rendering for EPUB novels and
-automatic right-to-left (RTL) page order for manga EPUBs and comic archives.
+automatic right-to-left (RTL) page order for manga EPUBs and comic archives,
+[Yomitan-style dictionary lookups](#japanese-dictionary-lookups-yomitan), and
+[marking of already looked-up words](#looked-up-words) with optional furigana.
 It is regularly synced with upstream KOReader (master / nightly).
 
 ![Vertical text rendering of 三四郎 (Natsume Soseki)](doc/screenshots/tategumi.png)
@@ -15,6 +18,40 @@ It is regularly synced with upstream KOReader (master / nightly).
 
 Download the build for your device from the
 [latest release](https://github.com/m-tky/koreader-tategumi/releases/latest).
+
+## Japanese dictionary lookups (Yomitan)
+
+The bundled `yomitan.koplugin` looks up Japanese words the way
+[Yomitan](https://github.com/yomidevs/yomitan) does, using Yomitan dictionaries
+such as Jitendex:
+
+- Long-press (or tap, with **Tap to look up**) a character to select the longest
+  matching word from there, including inflected forms (食べさせられた → 食べる).
+  Ruby is skipped while scanning.
+- Results show the inflection chain, tags and rich definitions with images.
+- A compact popup with short definitions opens quickly; its **Full** button opens
+  the regular dictionary window.
+
+Convert dictionaries on a computer with
+`python3 tools/yomitan_convert.py -o out/ jitendex-yomitan.zip`, copy each folder
+from `out/` to `koreader/data/yomitan/`, then enable them in
+**Search settings → Yomitan dictionaries**. On Windows with a Kindle connected over
+USB (MTP), `tools/yomitan_install.ps1` converts the dictionaries and copies them
+together with the plugins. See the
+[plugin README](plugins/yomitan.koplugin/README.md) for details.
+
+## Looked-up words
+
+`bookwords.koplugin` replaces upstream's Vocabulary Builder. It remembers the words
+looked up in each book and marks them wherever they appear again in that book: a
+line beside the column in vertical text, under the line in horizontal text. With
+Yomitan, words are stored in dictionary form, so every inflection is marked.
+Optionally, the reading is shown as furigana beside marked words that contain kanji
+and have no ruby in the book (this needs enough line spacing).
+
+The options and the word list are in **Search → Looked-up words**. Tap a word in the
+list to look it up again, long-press it to forget it, or use the menu button at the
+top left to forget all the words of the book.
 
 ## Installation
 
@@ -236,11 +273,13 @@ project's main features, supported formats, and developer documentation.
 
 [English](#koreader-tategumi) | **日本語**
 
-**KOReader を日本語の縦書きと右開き漫画に対応させた個人フォークです。**
+**KOReader を日本語の縦書き・右開き漫画・Yomitan 辞書引きに対応させた個人フォークです。**
 
 日本語書籍向けの [KOReader](https://github.com/koreader/koreader) フォークです。
 EPUB 小説の `writing-mode: vertical-rl` レンダリングに加え、漫画 EPUB とコミック
 アーカイブの右から左（RTL）へのページ順序を自動検出します。
+[Yomitan 方式の辞書引き](#日本語辞書引きyomitan)と、
+[調べた単語の印付け](#調べた単語looked-up-words)（ふりがな表示も可）にも対応しています。
 upstream KOReader（master / nightly）と定期的に同期しています。
 
 ![三四郎（夏目漱石）の縦書き表示](doc/screenshots/tategumi.png)
@@ -250,6 +289,38 @@ upstream KOReader（master / nightly）と定期的に同期しています。
 ご利用の端末向けビルドを
 [最新リリース](https://github.com/m-tky/koreader-tategumi/releases/latest)
 からダウンロードしてください。
+
+## 日本語辞書引き（Yomitan）
+
+同梱の `yomitan.koplugin` は、Jitendex などの Yomitan 辞書を使って
+[Yomitan](https://github.com/yomidevs/yomitan) と同じ方式で日本語の単語を引きます:
+
+- 文字を長押し（**Tap to look up** を有効にするとタップ）すると、そこから一致する
+  最長の単語を選択します。活用形にも対応します（食べさせられた → 食べる）。
+  走査時にルビは読み飛ばします。
+- 結果には活用の経路、タグ、画像付きのリッチな定義が表示されます。
+- 短い定義を表示するコンパクトなポップアップはすぐに開きます。**Full** ボタンで
+  通常の辞書ウィンドウを開きます。
+
+辞書はパソコン上で
+`python3 tools/yomitan_convert.py -o out/ jitendex-yomitan.zip` により変換し、
+`out/` 内の各フォルダを `koreader/data/yomitan/` にコピーしてから
+**検索設定 → Yomitan dictionaries** で有効にしてください。Windows で Kindle を USB
+（MTP）接続している場合は、`tools/yomitan_install.ps1` が辞書の変換とプラグインを
+含めたコピーを行います。詳細は[プラグインの README](plugins/yomitan.koplugin/README.md)
+を参照してください。
+
+## 調べた単語（Looked-up words）
+
+`bookwords.koplugin` は upstream の単語帳（Vocabulary Builder）に代わるプラグインです。
+本ごとに調べた単語を記録し、同じ本の中で再び出てきた箇所に印を付けます（縦書きでは
+行の横に傍線、横書きでは下線）。Yomitan 使用時は辞書形で記録するため、活用形にも
+印が付きます。オプションで、漢字を含みルビの無い単語の横に読みをふりがなとして
+表示できます（十分な行間が必要です）。
+
+設定と単語一覧は **検索 → Looked-up words** にあります。一覧の単語をタップすると
+再度辞書を引き、長押しすると記録を削除します。左上のメニューボタンから、その本の
+単語をすべて削除できます。
 
 ## インストール
 
