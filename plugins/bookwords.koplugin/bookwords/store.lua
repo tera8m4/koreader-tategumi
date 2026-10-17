@@ -51,7 +51,9 @@ function Store:_changed()
     self.first_chars = nil
 end
 
-function Store:add(term, reading, surface)
+--- Record a lookup of `surface` (looked up as `term`, `reading`), found in
+-- `sentence` if known.
+function Store:add(term, reading, surface, sentence)
     local key = Store.key(term, reading)
     local word = self.words[key]
     if not word then
@@ -62,6 +64,9 @@ function Store:add(term, reading, surface)
     word.last = os.time()
     if surface and surface ~= "" then
         word.surfaces[surface] = true
+    end
+    if sentence and sentence ~= "" then
+        word.sentence, word.sentence_word = sentence, surface
     end
     self:_changed()
     return key
@@ -97,6 +102,23 @@ function Store:list()
         return a.key < b.key
     end)
     return list
+end
+
+--- Words not sent to Anki yet, in list() order: {key, word} pairs.
+function Store:unsent()
+    local out = {}
+    for _, item in ipairs(self:list()) do
+        local word = self.words[item.key]
+        if not word.anki then
+            table.insert(out, { key = item.key, word = word })
+        end
+    end
+    return out
+end
+
+function Store:markSent(key)
+    local word = self.words[key]
+    if word then word.anki = true end
 end
 
 local function forms(word)

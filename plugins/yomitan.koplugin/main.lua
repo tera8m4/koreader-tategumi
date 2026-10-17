@@ -402,6 +402,27 @@ function Yomitan:matchAt(text)
     return length, words
 end
 
+--- Plain-text definitions of the entry for `term` (with `reading`, if not
+-- empty), one paragraph per dictionary.
+function Yomitan:getDefinition(term, reading)
+    if not self:isActive() then return end
+    for _, entry in ipairs(self:findTerms(term).entries) do
+        for _, headword in ipairs(entry.headwords) do
+            if headword.term == term and (not reading or reading == "" or headword.reading == reading) then
+                local parts, seen = {}, {}
+                for _, definition in ipairs(entry.definitions) do
+                    local title = definition.dictionary
+                    if not seen[title] then
+                        seen[title] = true
+                        table.insert(parts, Text.entryForDictionary(entry, title))
+                    end
+                end
+                return table.concat(parts, "\n\n")
+            end
+        end
+    end
+end
+
 -- Lookup backend (see ReaderDictionary:setLookupBackend)
 
 --- The HTML entry of a result from buildResults(), built on first use.
