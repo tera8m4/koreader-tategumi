@@ -4,7 +4,7 @@ ReaderView module marking the recorded words on the current page.
 The page's characters are read with crengine (ruby text skipped), matched
 with bookwords/matcher.lua, and the screen boxes of the matches are cached
 per page. Matching runs right after the page is shown, so page turns are not
-delayed; the marks then appear with a fast refresh of their area only.
+delayed; the marks then appear with a refresh of their area only.
 
 Marks are a thin line beside each column (vertical text) or under each line
 (horizontal text). Optionally, the reading is drawn beside words containing
@@ -99,7 +99,9 @@ function Marker:_schedule()
             return
         end
         if self.region then
-            UIManager:setDirty(self.ui.dialog, "fast", self.region)
+            -- Not "fast": its black-and-white waveform drops the gray
+            -- lines and the antialiasing of the furigana.
+            UIManager:setDirty(self.ui.dialog, "ui", self.region)
         end
     end)
 end
@@ -143,9 +145,10 @@ local function furiganaFace(px)
     return Font:getFace("cfont", pt)
 end
 
-function Marker:_addFurigana(reading, box, vertical)
+--- Furigana on the ruby side of the glyphs of `box` (`col` from glyphColumn()).
+function Marker:_addFurigana(reading, box, col, vertical)
     if vertical then
-        local px = math.max(6, math.floor(box.w * 0.5))
+        local px = math.max(6, math.floor(col.em * 0.5))
         local face = furiganaFace(px)
         local chars = util.splitToChars(reading)
         local widgets, total = {}, 0
@@ -156,19 +159,35 @@ function Marker:_addFurigana(reading, box, vertical)
         local y = box.y + math.floor((box.h - total) / 2)
         for _, w in ipairs(widgets) do
             local size = w:getSize()
-            table.insert(self.furigana, { widget = w, x = box.x + box.w, y = y })
-            self:_extend(Geom:new{ x = box.x + box.w, y = y, w = size.w, h = size.h })
+            local x = col.hi
+            table.insert(self.furigana, { widget = w, x = x, y = y })
+            self:_extend(Geom:new{ x = x, y = y, w = size.w, h = size.h })
             y = y + size.h
         end
     else
-        local px = math.max(6, math.floor(box.h * 0.45))
+        local px = math.max(6, math.floor(col.em * 0.5))
         local w = TextWidget:new{ text = reading, face = furiganaFace(px), padding = 0 }
         local size = w:getSize()
         local x = box.x + math.floor((box.w - size.w) / 2)
-        local y = box.y - size.h
+        local y = col.lo - size.h
         table.insert(self.furigana, { widget = w, x = x, y = y })
         self:_extend(Geom:new{ x = x, y = y, w = size.w, h = size.h })
     end
+end
+
+--- Where the glyphs are across a line box: the boxes span the whole line
+-- height (line spacing included), the glyphs one em centered in it. The em
+-- is estimated from the span's advance per character.
+local function glyphColumn(boxes, length, vertical)
+    local advance = 0
+    for _, box in ipairs(boxes) do
+        advance = advance + (vertical and box.h or box.w)
+    end
+    local box = boxes[1]
+    local across = vertical and box.w or box.h
+    local em = math.min(across, math.max(1, math.floor(advance / length)))
+    local lo = (vertical and box.x or box.y) + math.floor((across - em) / 2)
+    return { em = em, lo = lo, hi = lo + em }
 end
 
 function Marker:_extend(rect)
@@ -199,7 +218,7 @@ function Marker:_compute()
     local thickness = math.max(1, Screen:scaleBySize(2))
     local gap = math.max(1, Screen:scaleBySize(1))
     local found = {}
-    local vertical -- writing direction of the page, from the first multi-character box
+    local vertical = doc.isVerticalPage and doc:isVerticalPage(doc:getCurrentPage())
     for _, span in ipairs(spans) do
         local first, last = info[span.start], info[span.start + span.length - 1]
         if first and last then
@@ -208,32 +227,30 @@ function Marker:_compute()
             for j = span.start, span.start + span.length - 1 do
                 if info[j] and info[j].ruby then ruby = true end
             end
-            if vertical == nil then
-                for _, box in ipairs(boxes) do
-                    if span.length > 1 and box.w ~= box.h then
-                        vertical = box.h > box.w
-                        break
-                    end
-                end
-            end
-            table.insert(found, { boxes = boxes, key = span.key, ruby = ruby })
+            table.insert(found, { boxes = boxes, key = span.key, ruby = ruby, length = span.length })
         end
     end
     for _, item in ipairs(found) do
-        for _, box in ipairs(item.boxes) do
-            local mark
-            if vertical then
-                mark = Geom:new{ x = box.x - gap - thickness, y = box.y, w = thickness, h = box.h }
-            else
-                mark = Geom:new{ x = box.x, y = box.y + box.h + gap, w = box.w, h = thickness }
+        if item.boxes[1] then
+            local col = glyphColumn(item.boxes, item.length, vertical)
+            for _, box in ipairs(item.boxes) do
+                -- The mark goes beside the glyphs, opposite the furigana.
+                local mark
+                if vertical then
+                    local x = col.lo + box.x - item.boxes[1].x - gap - thickness
+                    mark = Geom:new{ x = x, y = box.y, w = thickness, h = box.h }
+                else
+                    local y = col.hi + box.y - item.boxes[1].y + gap
+                    mark = Geom:new{ x = box.x, y = y, w = box.w, h = thickness }
+                end
+                table.insert(self.marks, mark)
+                self:_extend(mark)
             end
-            table.insert(self.marks, mark)
-            self:_extend(mark)
-        end
-        local word = store.words[item.key]
-        if self.plugin.settings.furigana and word and not item.ruby and item.boxes[1]
-                and word.reading ~= "" and word.reading ~= word.term and hasKanji(word.term) then
-            self:_addFurigana(word.reading, item.boxes[1], vertical)
+            local word = store.words[item.key]
+            if self.plugin.settings.furigana and word and not item.ruby
+                    and word.reading ~= "" and word.reading ~= word.term and hasKanji(word.term) then
+                self:_addFurigana(word.reading, item.boxes[1], col, vertical)
+            end
         end
     end
     self.cache_key = key

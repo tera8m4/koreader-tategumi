@@ -28,7 +28,7 @@ local BookWords = WidgetContainer:extend{
 function BookWords:init()
     self.settings = G_reader_settings:readSetting(SETTINGS_KEY) or {}
     if self.settings.mark == nil then self.settings.mark = true end
-    if self.settings.furigana == nil then self.settings.furigana = false end
+    if self.settings.furigana == nil then self.settings.furigana = true end
     self.ui.menu:registerToMainMenu(self)
 end
 
