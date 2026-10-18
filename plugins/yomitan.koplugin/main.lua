@@ -35,7 +35,6 @@ local Japanese = require("yomitan/japanese")
 local Scanner = require("yomitan/scanner")
 local Text = require("yomitan/text")
 local Translator = require("yomitan/translator")
-local WordList = require("yomitan/wordlist")
 
 local fullDefinition -- defined below
 
@@ -46,8 +45,6 @@ local SETTINGS_KEY = "yomitan"
 -- and file manager); connections are read-only.
 local opened_dictionaries = {} -- folder name -> Dictionary
 local open_errors = {} -- folder name -> error message
--- Signature of the word list loaded into crengine (see updateKeepWords).
-local loaded_words_signature
 
 local Yomitan = WidgetContainer:extend{
     name = "yomitan",
@@ -135,29 +132,24 @@ function Yomitan:isActive()
 end
 
 --- Keep Japanese words together at column breaks: crengine segments the text
--- with the enabled dictionaries (see yomitan/wordlist.lua). Runs before the
--- document is rendered; with `rerender`, re-renders it after a change.
+-- into words found in the enabled dictionaries, querying their databases
+-- directly. Runs before the document is rendered; with `rerender`, re-renders
+-- it after a change.
 function Yomitan:updateKeepWords(rerender)
     local document = self.ui and self.ui.document
     if not (document and document.provider == "crengine") then return end
     local cre = require("document/credocument"):engineInit()
     local min_keep = self:isActive() and self.settings.keep_words or 0
+    local paths = {}
     if min_keep > 0 then
-        local path, signature = WordList.update(self.dictionaries, self:getDataDir())
-        if not path then
-            min_keep = 0
-        elseif signature ~= loaded_words_signature then
-            loaded_words_signature = nil
-            if cre.jpSetWords(path) then
-                loaded_words_signature = signature
-            else
-                logger.warn("yomitan: cannot load the word list", path)
-                min_keep = 0
-            end
+        for _, dict in ipairs(self.dictionaries) do
+            table.insert(paths, dict.dir .. "/dict.sqlite3")
         end
-    elseif loaded_words_signature then
-        cre.jpSetWords("")
-        loaded_words_signature = nil
+    end
+    local ok, err = cre.jpSetDictionaries(paths)
+    if not ok then
+        logger.warn("yomitan: cannot use the dictionaries to keep words together:", err)
+        min_keep = 0
     end
     cre.jpSetKeepIdioms(self.settings.keep_idioms == true)
     cre.jpSetMinKeep(min_keep)
@@ -674,7 +666,7 @@ function Yomitan:addToMainMenu(menu_items)
                     local n = self.settings.keep_words
                     return n > 0 and T(_("Keep words together: %1 letters"), n) or _("Keep words together: off")
                 end,
-                help_text = _("In vertical Japanese text, avoid splitting words across columns (such as 飛び降|りる), using the enabled dictionaries. A word part left at a column end or start keeps at least this many letters. The first use builds a word list from the dictionaries, which can take a while."),
+                help_text = _("In vertical Japanese text, avoid splitting words across columns (such as 飛び降|りる), using the enabled dictionaries. A word part left at a column end or start keeps at least this many letters. Rendering a book takes longer with this on."),
                 sub_item_table = keep_words_items,
             },
             {

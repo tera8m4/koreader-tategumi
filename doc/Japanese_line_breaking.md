@@ -88,7 +88,7 @@ The input is one paragraph. The output is a list of words, each with flags.
    programming over positions. Candidate edges are substrings of 1–16
    characters:
    - **A dictionary match.** Deinflect the substring with the Yomitan rules.
-     A result matches when its text is in the word list and its conditions
+     A result matches when its text is a key of the dictionaries and its conditions
      are 0 or share a flag with the entry's part-of-speech flags (exactly
      Yomitan's `conditionsMatch`). When several results match, prefer an
      entry that is both common and written this way (flags `c` and `w`
@@ -204,12 +204,17 @@ koreader:
     rebuilt from the parent links, and the cycle check walks the same chain.
   - Rules are loaded at runtime from the Lua descriptor, so
     `transforms_ja.lua` stays the single source of rule data.
-- **`JpWordList`**:
-  - Loads `words.tsv` into one buffer plus an offsets array and looks keys up
-    by binary search.
-  - Each line is `key<TAB>pos-rules<TAB>flags`, with flags drawn from `pcxw`.
-  - `getHash()` covers the file contents and the settings, like
-    `UserHyphDict`.
+- **`JpDictionary`** (interface): returns the `terms` rows of a key, or of
+  every key with a given prefix. koreader-base implements it over the Yomitan
+  plugin's databases, so there is no separate word list.
+  - crengine works out the [word flags](#word-flags) from the rows (rows
+    tagged `forms` do not count).
+  - It fetches keys by their first three characters: deinflection only
+    rewrites the end of a word, so one query answers every candidate with
+    that prefix. Keys of one or two characters are queried exactly.
+  - The fetched keys stay in an LRU cache of up to 50 000 keys (a few MB).
+  - `getHash()` identifies the databases (paths, sizes, mtimes), for the
+    render hash.
 - **`JpWords`** (static facade):
   - `setMinKeep(int)`: 0 means off.
   - `segment(text, from, to)`: best-path segmentation and units for a window.
@@ -251,7 +256,9 @@ The functions sit in one block next to `setUserHyphenationDict`, plus their
 - `cre.jpDeinflect(text)` returns the same table shape as the Lua
   `transform()`: 1-based `rule_index`, flags as signed 32-bit integers.
 - `cre.jpConditionFlags(pos_list)`
-- `cre.jpSetWords(path)`
+- `cre.jpSetDictionaries(paths)`: the `dict.sqlite3` files of the enabled
+  dictionaries, opened read-only by `jpdictionary.cpp` (fork-only file in
+  koreader-base; `koreader-cre` links SQLite)
 - `cre.jpSetMinKeep(n)`
 
 ### koreader: Lua
@@ -260,17 +267,8 @@ The functions sit in one block next to `setUserHyphenationDict`, plus their
   API, so `translator.lua` is unchanged.
   - The plugin now requires this fork's build; there is no Lua fallback.
   - `getUserFacingInflectionRules` and `conditionsMatch` stay in Lua.
-- **New `yomitan/wordlist.lua`** builds `<yomitan data dir>/words.tsv` from
-  the enabled dictionaries.
-  - It reads `SELECT expression, reading, definition_tags, rules, term_tags
-    FROM terms`, skipping rows tagged `forms`.
-  - Readings become separate keys.
-  - Flags follow the table above.
-  - Keys longer than 16 characters are dropped.
-  - Keys are sorted by bytes and the file is written atomically.
-  - It rebuilds only when the signature (enabled dictionaries, their sizes
-    and mtimes) changes, then calls `cre.jpSetWords`.
-  - It runs from `Yomitan:init`, before the render.
+- **`Yomitan:updateKeepWords()`** passes the enabled dictionaries' database
+  paths to `cre.jpSetDictionaries` from `Yomitan:init`, before the render.
 - **Settings:** "Keep words together: off / 2 / 3 letters" and "Idioms as one
   word". On change, re-render the way `ReaderUserHyph` does.
 
@@ -281,12 +279,19 @@ The functions sit in one block next to `setUserHyphenationDict`, plus their
 - **Budget:** at most 15% more render time with keep-words on, and none with
   it off.
 - **Cost:** one segmentation window per column (about 32 characters),
-  meaning a few hundred dictionary probes.
-- **If over budget:**
-  - Check the first character against a bitset of the word list's first
-    characters before deinflecting.
-  - Cap substring length at the longest key in the list.
-  - Memoise lookups per paragraph.
+  meaning a few hundred dictionary probes, served by the prefix cache.
+- **Measured on a desktop** (x86-64, the full 坊っちゃん: 88 291 characters,
+  one window per 40 characters):
+  - SQLite with three-character prefixes: about 53 000 queries returning
+    85 000 rows, 1.3 s for the book (0.65 ms per column).
+  - The same with an in-memory word list instead of SQLite: 0.25 s.
+  - Two-character prefixes return far more rows (346 000 for the book with
+    an unbounded cache, 1.5 million with the 50 000-key one): 2.5 s.
+  - SQLite memory-mapped I/O gained 13%; it is not used, to spare address
+    space on 32-bit devices.
+- **If over budget:** a precomputed table of keys and flags, with a covering
+  index, written into each database by `tools/yomitan_convert.py`, would make
+  each query a single index lookup.
 - Use timing logs only; no new diagnostic counters (AGENTS.md).
 
 ### Tests
@@ -295,7 +300,8 @@ The functions sit in one block next to `setUserHyphenationDict`, plus their
   `transform_cases.lua` (1522 lines) runs against the C++ code through the
   wrapper and must pass unchanged.
 - **New `spec/unit/jpwords_spec.lua`:** segmentation and split costs on a
-  small `words.tsv` fixture:
+  small dictionary fixture (`spec/unit/yomitan/jpwords_dictionary/`, the
+  JMdict entries these sentences can match):
   - 沈めて·いく·と
   - 飛び降りて
   - いない as いる
@@ -361,6 +367,8 @@ Steps:
      - one line in `CMakeLists.txt`
      - one block plus registration lines in `cre.cpp`
      - `base/.gitmodules`
+     - the `koreader-cre` lines in `thirdparty/cmake_modules/koreader_targets.cmake`
+       (`jpdictionary.cpp`, `sqlite::sqlite3`)
 
 Not covered here: the release and OTA download URLs in
 `.github/workflows/{nightly,release}.yml` and `frontend/ui/otamanager.lua`
@@ -373,7 +381,7 @@ Change them separately if releases should come from the tera8m4 repository.
 |---|---|---|
 | 1 | JLReq squeeze-in at the vertical break test; kinsoku cascade moved into a helper | crengine |
 | 2 | `JpDeinflector` in C++, `cre` bindings, Lua wrapper; Yomitan specs green | crengine, base, koreader |
-| 3 | `JpWordList`, segmentation, units, break scoring, `wordlist.lua`, settings, render hash, specs | all three |
+| 3 | `JpDictionary` over the Yomitan databases, segmentation, units, break scoring, settings, render hash, specs | all three |
 | 4 (optional) | Same rule in `processParagraphHorizontal` for horizontal Japanese | crengine |
 
 Each phase lands through the push chain on its own.
@@ -390,9 +398,10 @@ locally:
     Lua port's.
   - Segmentation, units and split costs match the demo at every position of
     every paragraph of `samples.json`.
-- `wordlist.lua`'s query and merge give the same `words.tsv` as the demo's
-  `make_words.py` on JMdict (450 891 keys). For this check, LuaJIT ran with
-  mocked SQLite cursors.
+- With `jpdictionary.cpp` and SQLite 3.54.0 (the version koreader-base
+  builds) on the JMdict database, the split costs are again identical to the
+  demo's, whose flags come from `make_words.py`. The spec fixture gives the
+  same results as the full JMdict for the spec sentences.
 - `lvtextfm.cpp` and `cre.cpp` pass `clang++ -fsyntax-only` with stub
   headers.
 
@@ -424,15 +433,18 @@ Differences from the plan:
 - **One rule set:** the engine holds a single deinflection rule set.
   `LanguageTransformer:addDescriptor()` replaces it.
 - **Default:** keep-words is off; it is under *Yomitan dictionaries → Keep
-  words together*. The word list (`words.tsv`, with `words.sig` holding the
-  dictionary signature) is built on first use.
+  words together*.
+- **No word list file:** words are looked up in the dictionary databases
+  directly (see `JpDictionary`), instead of a `words.tsv` built from them.
 - **Re-rendering:** a change of these settings calls `requestRender()`
   before `UpdatePos`. Settings that are not document properties do not
   request a render by themselves.
 
 Still to do:
 
-- Measure render time against the budget in [Performance](#performance).
+- Measure render time on a device against the budget in
+  [Performance](#performance). From the desktop numbers, keep-words could
+  cost several seconds per full render of a novel on an e-reader.
 - Run the specs in CI and tune the assertions of
   `vertical_keep_words_spec.lua` if needed. It assumes about 50 characters
   per column at most.
