@@ -8,8 +8,6 @@ line breaking that keeps words together. Based on
 [m-tky/koreader-tategumi](https://github.com/m-tky/koreader-tategumi) and synced
 with upstream KOReader master.
 
-![Vertical text rendering of 三四郎 (Natsume Soseki)](doc/screenshots/tategumi.png)
-
 ## Install
 
 Download the package for your device from the
@@ -90,8 +88,6 @@ Jitendex is licensed under CC BY-SA 4.0 and includes JMdict data from the
 縦書き、右開きの漫画、Yomitan 方式の辞書引き、単語を分割しない改行に対応しています。
 [m-tky/koreader-tategumi](https://github.com/m-tky/koreader-tategumi) をベースに、
 upstream KOReader の master と同期しています。
-
-![三四郎（夏目漱石）の縦書き表示](doc/screenshots/tategumi.png)
 
 ## インストール
 
