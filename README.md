@@ -2,273 +2,83 @@
 
 **English** | [日本語](#日本語)
 
-**KOReader fork for Japanese vertical text (縦書き), right-to-left manga, and
-Yomitan dictionary lookups.**
-
-This is a personal fork of [KOReader](https://github.com/koreader/koreader) for
-Japanese books. It adds `writing-mode: vertical-rl` rendering for EPUB novels and
-automatic right-to-left (RTL) page order for manga EPUBs and comic archives,
-[Yomitan-style dictionary lookups](#japanese-dictionary-lookups-yomitan), and
-[marking of already looked-up words](#looked-up-words) with optional furigana.
-It is regularly synced with upstream KOReader (master / nightly).
+A [KOReader](https://github.com/koreader/koreader) fork for Japanese books:
+vertical text (縦書き), right-to-left manga, Yomitan dictionary lookups and
+line breaking that keeps words together. Based on
+[m-tky/koreader-tategumi](https://github.com/m-tky/koreader-tategumi) and synced
+with upstream KOReader master.
 
 ![Vertical text rendering of 三四郎 (Natsume Soseki)](doc/screenshots/tategumi.png)
 
-## Downloads
+## Install
 
-Download the build for your device from the
-[latest release](https://github.com/m-tky/koreader-tategumi/releases/latest).
+Download the package for your device from the
+[latest release](https://github.com/tera8m4/koreader-tategumi/releases/latest)
+and install it like upstream KOReader
+([Kindle](https://github.com/koreader/koreader/wiki/Installation-on-Kindle-devices) •
+[Kobo](https://github.com/koreader/koreader/wiki/Installation-on-Kobo-devices) •
+[Android](https://github.com/koreader/koreader/wiki/Installation-on-Android-devices)).
+Installing over an existing KOReader keeps your settings.
 
-## Japanese dictionary lookups (Yomitan)
+For vertical text, choose a Japanese font with the OpenType `vert` and `vrt2`
+features, such as Noto Serif CJK JP.
 
-The bundled `yomitan.koplugin` looks up Japanese words the way
-[Yomitan](https://github.com/yomidevs/yomitan) does, using Yomitan dictionaries
-such as Jitendex:
+## Dictionary
 
-- Long-press (or tap, with **Tap to look up**) a character to select the longest
-  matching word from there, including inflected forms (食べさせられた → 食べる).
-  Ruby is skipped while scanning.
-- Results show the inflection chain, tags and rich definitions with images.
-- A compact popup with short definitions opens quickly; its **Full** button opens
-  the regular dictionary window.
+Each release includes `yomitan-jitendex.zip`, [Jitendex](https://jitendex.org)
+converted for the Yomitan plugin:
 
-Convert dictionaries on a computer with
-`python3 tools/yomitan_convert.py -o out/ jitendex-yomitan.zip`, copy each folder
-from `out/` to `koreader/data/yomitan/`, then enable them in
-**Search settings → Yomitan dictionaries**. On Windows with a Kindle connected over
-USB (MTP), `tools/yomitan_install.ps1` converts the dictionaries and copies them
-together with the plugins. See the
-[plugin README](plugins/yomitan.koplugin/README.md) for details.
+1. Unzip it into `koreader/data/yomitan/` on the device.
+2. Enable it in **Search settings → Yomitan dictionaries → Manage dictionaries**.
 
-## Looked-up words
+To use other Yomitan dictionaries, convert them on a computer with
+`python3 tools/yomitan_convert.py -o out/ dictionary.zip` and copy each folder
+from `out/` to the same place. On Windows, `tools/yomitan_install.ps1` converts
+them and copies them to a Kindle connected over USB. See the
+[plugin README](plugins/yomitan.koplugin/README.md).
 
-`bookwords.koplugin` replaces upstream's Vocabulary Builder. It remembers the words
-looked up in each book and marks them wherever they appear again in that book: a
-line beside the column in vertical text, under the line in horizontal text. With
-Yomitan, words are stored in dictionary form, so every inflection is marked.
-Optionally, the reading is shown as furigana beside marked words that contain kanji
-and have no ruby in the book (this needs enough line spacing).
+## Yomitan lookups
 
-The options and the word list are in **Search → Looked-up words**. Tap a word in the
-list to look it up again, long-press it to forget it, or use the menu button at the
-top left to forget all the words of the book.
+- Long-press a character, or tap it with **Tap to look up**, to select the
+  longest word starting there, including inflected forms
+  (食べさせられた → 食べる). Furigana is skipped.
+- A compact popup shows short definitions; **Full** opens the whole entry with
+  tags, the inflection chain and images.
+- Looked-up words are remembered per book and marked wherever they appear
+  again, with optional furigana and export to Anki
+  (**Search → Looked-up words**).
 
-## Installation
+## Line breaking
 
-### Standard installation
+In vertical text, columns no longer break in the middle of a word (飛び降|りる).
+The text is split into words with the enabled Yomitan dictionaries, inflected
+forms included, and a column break:
 
-Installation steps are the same as upstream KOReader:
-[Android](https://github.com/koreader/koreader/wiki/Installation-on-Android-devices) •
-[Kindle](https://github.com/koreader/koreader/wiki/Installation-on-Kindle-devices) •
-[Kobo](https://github.com/koreader/koreader/wiki/Installation-on-Kobo-devices)
+- falls between words where it can, keeping short particles with their word
+  (二階から|飛び降りて);
+- leaves at least 3 letters on each side when it has to split a word;
+- keeps idioms such as 腰を抜かす together;
+- squeezes the rest of a word into the column when the column's punctuation
+  spacing can shrink, instead of splitting it.
 
-Kindle, Kobo, PocketBook, Cervantes, and reMarkable builds support KOReader's
-file-based OTA updater: **Menu → Update → Check for update**. Android APK builds
-use Android's APK install flow instead; the APKs published by this fork's GitHub
-releases support the same in-app update check, download the next APK in-app, and
-then hand it to Android's installer.
+This is on whenever a Yomitan dictionary is enabled. Columns can be slightly
+looser, and books take a little longer to render. See
+[doc/Japanese_line_breaking.md](doc/Japanese_line_breaking.md).
 
-### Fonts for Japanese vertical text
+## Vertical text and manga
 
-For correct vertical punctuation and symbols, select a Japanese font with the
-OpenType `vert` and `vrt2` features—`vrt2` is especially important for some
-composite vertical glyphs. Fonts without these vertical substitutions can leave
-brackets, quotation marks, dashes, and other symbols in horizontal forms.
-**Noto Sans CJK JP** and **Noto Serif CJK JP** are suitable examples; add one
-through KOReader's font settings and select it as the document font.
+- EPUBs with `writing-mode: vertical-rl` render vertically. For other books,
+  enable **Document → Document settings → Vertical reading** (saved per book).
+- Manga EPUBs with `page-progression-direction="rtl"`, and CBZ/CBR/CBT archives
+  marked right-to-left in `ComicInfo.xml`, turn pages right to left. Change it
+  in **Menu → Taps & gestures → Page turns → Switch page-turn direction**.
 
-### Kindle: install with KPM
+## Credits
 
-On a Kindle with the Kindle Package Manager (KPM), add this fork's repository once:
-
-```text
-;kpm add-repo https://raw.githubusercontent.com/m-tky/koreader-tategumi/master/kpm/manifest.json
-```
-
-> **Known KPM limitation:** entering this command in the Kindle search bar currently
-> fails because Amazon's `scriptExecutor` rejects characters such as `:` and `.`
-> before KPM starts ([KindleModding/KPM#5](https://github.com/KindleModding/KPM/issues/5)).
-> Run the following command from kterm or a scriptlet instead:
->
-> ```sh
-> /var/local/kmc/bin/kpm add-repo "https://raw.githubusercontent.com/m-tky/koreader-tategumi/master/kpm/manifest.json"
-> ```
-
-Then install either channel:
-
-```text
-;kpm install koreader-tategumi
-;kpm install koreader-tategumi-nightly
-```
-
-The first command installs the latest numbered release; the second installs the
-latest nightly build. Both support Kindle PW2 and newer, including Kindle HF
-devices. They share the same KOReader installation directory, so installing one
-replaces the other while keeping your KOReader settings.
-
-Launch the selected package from the Kindle search bar:
-
-```text
-;kpm launch koreader-tategumi
-;kpm launch koreader-tategumi-nightly
-```
-
-Installation also adds a matching scriptlet to the Kindle library. If KUAL is
-installed, its existing KOReader menu entry remains available as well; KPM handles
-installation and updates, whereas KUAL is a launcher UI.
-
-### Switching from vanilla KOReader
-
-For legacy file-based installs using zsync, a one-time migration helper lets you
-switch through KOReader's update menu:
-
-1. Exit KOReader and back up your existing KOReader directory, including settings
-   and reading progress.
-2. Download the migration helper **[otamanager.lua](https://github.com/m-tky/koreader-tategumi/releases/latest/download/otamanager.lua)**
-   (also attached to v2026.10 and later releases). Alternatively, save
-   the [migration helper](https://raw.githubusercontent.com/m-tky/koreader-tategumi/master/tools/migration/otamanager.lua)
-   as `otamanager.lua`, not `otamanager.lua.txt`.
-3. Copy it to `<koreader-dir>/frontend/ui/otamanager.lua` on your device,
-   replacing the existing file.
-4. Restart KOReader and choose **Menu → Update → Check for update**, then confirm
-   the update to this fork's stable release.
-
-The update replaces the helper with this fork's normal updater. Subsequent
-updates use the same menu. The helper ignores saved vanilla mirrors and channels
-without changing those settings. Equal version numbers still allow migration.
-
-**Updates from the legacy zsync updater have been verified on a device.**
-
-Use the **migration helper**, not the normal `frontend/ui/otamanager.lua` from this
-repository: the latter requires kotasync components missing from legacy installs.
-For kotasync-based installs, or if the helper does not work, use your device's
-installation instructions linked above to install this fork's package over the
-existing installation. Do not delete the existing `koreader` directory first.
-If you abandon migration after copying the helper, restore the backed-up original
-`otamanager.lua` to return to vanilla's updater.
-
-For Android APK installs, including Boox devices, install this fork's Android APK
-from the release page instead. Back up settings and reading progress first. If
-Android refuses to install it over the existing app, do not uninstall the existing
-app before backing up its data. After migration, this fork's GitHub APK builds can
-check for updates in-app, download the next APK, and hand it to Android's installer.
-
-## Nightly builds
-
-In addition to tagged releases, a **nightly** build is produced automatically from
-the latest `master` every day (around 05:00 JST) for all supported devices. Use it
-to get vertical-text fixes and features before they land in a numbered release —
-at the cost of less testing, so it may be less stable.
-
-- **Download**: the rolling
-  [`nightly` pre-release](https://github.com/m-tky/koreader-tategumi/releases/tag/nightly)
-  (labelled `vYYYY.MM.DD`). It is replaced in place by each build, so the link
-  always points at the most recent one.
-- **OTA for nightly builds**: on Kindle, Kobo, PocketBook, Cervantes,
-  reMarkable, and this fork's Android APK builds, switch the update channel to
-  development if you want to receive nightly builds:
-  **Menu → Update → Settings → Update channel → Development**, then
-  **Menu → Update → Check for update**. Switch back to **Stable** to return to
-  numbered releases.
-
-## Using vertical text
-
-EPUBs that already contain `writing-mode: vertical-rl` in their CSS (most commercial
-Japanese novels do) render vertically automatically.
-
-For EPUBs that do not specify vertical writing, enable **Document → Document
-settings → Vertical reading** (saved per book). Books styled for horizontal reading
-may not lay out as expected.
-
-Alternatively, add the following via **Document (page icon) → Style tweaks →
-Book-specific tweak** (long-press to edit):
-
-```css
-body { writing-mode: vertical-rl !important; }
-```
-
-## Automatic RTL page order (漫画・右開き)
-
-Japanese manga EPUBs and CBZ/CBR/CBT comic archives with right-to-left page order
-are detected automatically when you open them for the first time:
-
-- **EPUB**: reads `page-progression-direction="rtl"` from the OPF spine
-- **CBZ/CBR/CBT**: reads the standard
-  `<Manga>YesAndRightToLeft</Manga>` value from `ComicInfo.xml`
-  (`<ReadingDirection>RTL</ReadingDirection>` and `RightToLeft` are also
-  accepted for compatibility)
-
-`ComicInfo.xml` may be at the archive root or in a subdirectory. The detector also
-handles namespaced XML, a UTF-8 BOM, comments, case differences in the archive path,
-and common separator/capitalization variants of the compatibility values.
-
-When RTL is detected a notification appears. Page turns—including physical left
-and right arrow keys—follow the RTL reading order, and the progress bar fills from
-right (page 1) to left (last page).
-
-You can always override the detected direction via
-**Menu → Taps & gestures → Page turns → Switch page-turn direction**.
-The override is saved per-book and will not be overwritten on subsequent opens.
-
-## Known limitations
-
-- **Mixed writing modes within a single page**: Books that switch writing mode per
-  section — a vertical novel with a horizontal author bio, colophon or ad page, for
-  example — now render each page in its own mode. What is still unsupported is mixing
-  horizontal and vertical content *within one page* (e.g. a horizontal table or block
-  embedded in vertical body text); such intra-page mixing may not display correctly.
-
-- **Whitespace between ruby groups**: EPUBs with stray whitespace adjacent to ruby
-  groups may show a small gap between the ruby and the following character. This is
-  a property of the EPUB source, not a rendering bug.
-
-- **Double paragraph indent**: Some EPUBs use a U+3000 ideographic space (`　`) for
-  indentation while CREngine also applies its default `text-indent: 1.2em`, producing
-  a two-character indent. Fix per-book via **Document (page icon) → Style
-  tweaks → Paragraph first-line indentation → 0** (no indent).
-
-## Compatibility
-
-This fork tracks upstream KOReader master, so its base is equivalent to upstream
-**nightly**, not the stable release. Reports about third-party plugins are welcome
-even without upstream verification, but noting whether the issue also reproduces in
-vanilla upstream KOReader nightly helps triage — plugin breakage that also occurs
-upstream is out of scope for this fork.
-
-### Related plugins
-
-The following plugins are maintained alongside this fork or tuned for
-Japanese/vertical-rl use:
-
-- **Bookends** ([m-tky/bookends.koplugin](https://github.com/m-tky/bookends.koplugin)) —
-  configurable text overlays. Forked from
-  [AndyHazz/bookends.koplugin](https://github.com/AndyHazz/bookends.koplugin) with
-  vertical-rl auto-detection so progress bars fill right→left in vertical documents.
-
-- **koreader-skk** ([m-tky/koreader-skk](https://github.com/m-tky/koreader-skk)) —
-  SKK Japanese input plugin for KOReader. KOReader's built-in Japanese keyboard
-  can enter hiragana and katakana, while this plugin adds SKK-style kana-to-kanji
-  conversion with a bundled dictionary. It supports both physical keyboards and
-  a touch virtual keyboard.
-
-## Support
-
-If you find this vertical text fork useful, you can support its development:
-
-[![GitHub Sponsors](https://img.shields.io/github/sponsors/m-tky?label=Sponsor&logo=GitHub&style=for-the-badge)](https://github.com/sponsors/m-tky)
-
-For the upstream KOReader project itself, please see
-[koreader/koreader](https://github.com/koreader/koreader).
-
-## Acknowledgements
-
-KOReader is an open-source e-book reader for e-ink devices, developed by volunteers
-around the world. The vertical text implementation in this fork is built
-on their work. See [upstream KOReader](https://github.com/koreader/koreader) for the
-project's main features, supported formats, and developer documentation.
-
-[![Last commit](https://img.shields.io/github/last-commit/m-tky/koreader-tategumi?color=orange)](https://github.com/m-tky/koreader-tategumi/commits/master)
-[![License](https://img.shields.io/github/license/koreader/koreader)](https://github.com/koreader/koreader/blob/master/COPYING)
+Built on [KOReader](https://github.com/koreader/koreader) (AGPL-3.0) and
+[m-tky/koreader-tategumi](https://github.com/m-tky/koreader-tategumi).
+Jitendex is licensed under CC BY-SA 4.0 and includes JMdict data from the
+[EDRDG](https://www.edrdg.org/).
 
 ---
 
@@ -276,261 +86,76 @@ project's main features, supported formats, and developer documentation.
 
 [English](#koreader-tategumi) | **日本語**
 
-**KOReader を日本語の縦書き・右開き漫画・Yomitan 辞書引きに対応させた個人フォークです。**
-
 日本語書籍向けの [KOReader](https://github.com/koreader/koreader) フォークです。
-EPUB 小説の `writing-mode: vertical-rl` レンダリングに加え、漫画 EPUB とコミック
-アーカイブの右から左（RTL）へのページ順序を自動検出します。
-[Yomitan 方式の辞書引き](#日本語辞書引きyomitan)と、
-[調べた単語の印付け](#調べた単語looked-up-words)（ふりがな表示も可）にも対応しています。
-upstream KOReader（master / nightly）と定期的に同期しています。
+縦書き、右開きの漫画、Yomitan 方式の辞書引き、単語を分割しない改行に対応しています。
+[m-tky/koreader-tategumi](https://github.com/m-tky/koreader-tategumi) をベースに、
+upstream KOReader の master と同期しています。
 
 ![三四郎（夏目漱石）の縦書き表示](doc/screenshots/tategumi.png)
 
-## ダウンロード
-
-ご利用の端末向けビルドを
-[最新リリース](https://github.com/m-tky/koreader-tategumi/releases/latest)
-からダウンロードしてください。
-
-## 日本語辞書引き（Yomitan）
-
-同梱の `yomitan.koplugin` は、Jitendex などの Yomitan 辞書を使って
-[Yomitan](https://github.com/yomidevs/yomitan) と同じ方式で日本語の単語を引きます:
-
-- 文字を長押し（**Tap to look up** を有効にするとタップ）すると、そこから一致する
-  最長の単語を選択します。活用形にも対応します（食べさせられた → 食べる）。
-  走査時にルビは読み飛ばします。
-- 結果には活用の経路、タグ、画像付きのリッチな定義が表示されます。
-- 短い定義を表示するコンパクトなポップアップはすぐに開きます。**Full** ボタンで
-  通常の辞書ウィンドウを開きます。
-
-辞書はパソコン上で
-`python3 tools/yomitan_convert.py -o out/ jitendex-yomitan.zip` により変換し、
-`out/` 内の各フォルダを `koreader/data/yomitan/` にコピーしてから
-**検索設定 → Yomitan dictionaries** で有効にしてください。Windows で Kindle を USB
-（MTP）接続している場合は、`tools/yomitan_install.ps1` が辞書の変換とプラグインを
-含めたコピーを行います。詳細は[プラグインの README](plugins/yomitan.koplugin/README.md)
-を参照してください。
-
-## 調べた単語（Looked-up words）
-
-`bookwords.koplugin` は upstream の単語帳（Vocabulary Builder）に代わるプラグインです。
-本ごとに調べた単語を記録し、同じ本の中で再び出てきた箇所に印を付けます（縦書きでは
-行の横に傍線、横書きでは下線）。Yomitan 使用時は辞書形で記録するため、活用形にも
-印が付きます。オプションで、漢字を含みルビの無い単語の横に読みをふりがなとして
-表示できます（十分な行間が必要です）。
-
-設定と単語一覧は **検索 → Looked-up words** にあります。一覧の単語をタップすると
-再度辞書を引き、長押しすると記録を削除します。左上のメニューボタンから、その本の
-単語をすべて削除できます。
-
 ## インストール
 
-### 通常のインストール
+[最新リリース](https://github.com/tera8m4/koreader-tategumi/releases/latest)から
+端末向けのパッケージをダウンロードし、upstream KOReader と同じ手順でインストール
+してください
+（[Kindle](https://github.com/koreader/koreader/wiki/Installation-on-Kindle-devices) •
+[Kobo](https://github.com/koreader/koreader/wiki/Installation-on-Kobo-devices) •
+[Android](https://github.com/koreader/koreader/wiki/Installation-on-Android-devices)）。
+既存の KOReader に上書きすれば設定は引き継がれます。
 
-インストール手順は upstream KOReader と同じです:
-[Android](https://github.com/koreader/koreader/wiki/Installation-on-Android-devices) •
-[Kindle](https://github.com/koreader/koreader/wiki/Installation-on-Kindle-devices) •
-[Kobo](https://github.com/koreader/koreader/wiki/Installation-on-Kobo-devices)
+縦書きには、OpenType の `vert` と `vrt2` 機能を持つ日本語フォント
+（Noto Serif CJK JP など）を選んでください。
 
-Kindle、Kobo、PocketBook、Cervantes、reMarkable 版は KOReader のファイル
-差し替え型 OTA アップデートに対応しています: **メニュー → 更新 → 更新を確認**。
-Android APK 版は Android の APK インストール機能を使います。本フォークの GitHub
-リリースで配布している APK では、同じアプリ内の更新確認から次の APK を検出・
-ダウンロードし、Android のインストーラに渡して更新できます。
+## 辞書
 
-### 日本語縦書き用フォント
+各リリースには、Yomitan プラグイン用に変換した [Jitendex](https://jitendex.org)
+（`yomitan-jitendex.zip`）が含まれます:
 
-縦書きの約物・記号を正しく表示するには、OpenType の `vert` と `vrt2` 機能を
-持つ日本語フォントを選んでください。特に `vrt2` は一部の複合縦組み字形に必要です。
-これらの縦組み字形に未対応のフォントでは、括弧・引用符・ダッシュなどが横書き用の
-字形のまま表示されることがあります。**Noto Sans CJK JP** や **Noto Serif CJK JP**
-が適しています。KOReader のフォント設定から追加し、文書フォントとして選択してください。
+1. 端末の `koreader/data/yomitan/` に展開します。
+2. **検索設定 → Yomitan dictionaries → Manage dictionaries** で有効にします。
 
-### Kindle: KPM を使ったインストール
+ほかの Yomitan 辞書は、パソコン上で
+`python3 tools/yomitan_convert.py -o out/ dictionary.zip` により変換し、`out/` 内の
+各フォルダを同じ場所にコピーしてください。Windows では `tools/yomitan_install.ps1`
+が変換と、USB 接続した Kindle へのコピーを行います。詳細は
+[プラグインの README](plugins/yomitan.koplugin/README.md) を参照してください。
 
-Kindle Package Manager（KPM）が導入済みの Kindle では、最初に一度だけ本フォークの
-リポジトリを追加します:
+## Yomitan 辞書引き
 
-```text
-;kpm add-repo https://raw.githubusercontent.com/m-tky/koreader-tategumi/master/kpm/manifest.json
-```
+- 文字を長押し（**Tap to look up** 有効時はタップ）すると、そこから始まる最長の
+  単語を選択します。活用形にも対応します（食べさせられた → 食べる）。ルビは
+  読み飛ばします。
+- コンパクトなポップアップに短い定義を表示し、**Full** でタグ・活用の経路・画像を
+  含む全体を開きます。
+- 調べた単語は本ごとに記録され、再び出てきた箇所に印が付きます。ふりがな表示と
+  Anki への送信も可能です（**検索 → Looked-up words**）。
 
-> **既知の KPM の制約:** このコマンドを Kindle の検索欄から入力すると、KPM の起動前に
-> Amazon の `scriptExecutor` が `:` や `.` などの文字を拒否するため、現在は失敗します
-> （[KindleModding/KPM#5](https://github.com/KindleModding/KPM/issues/5)）。代わりに kterm
-> または scriptlet から次のコマンドを実行してください:
->
-> ```sh
-> /var/local/kmc/bin/kpm add-repo "https://raw.githubusercontent.com/m-tky/koreader-tategumi/master/kpm/manifest.json"
-> ```
+## 改行
 
-続いて、利用したいチャンネルをインストールします:
+縦書きで、単語の途中での改行（飛び降|りる）を避けます。有効な Yomitan 辞書を使って
+本文を単語（活用形を含む）に分け、改行位置を次のように選びます:
 
-```text
-;kpm install koreader-tategumi
-;kpm install koreader-tategumi-nightly
-```
+- できるだけ単語の間で改行し、短い助詞は前の単語と一緒にします（二階から|飛び降りて）。
+- 単語の途中で改行する場合も、前後に 3 文字以上を残します。
+- 腰を抜かす などの慣用句は分割しません。
+- 行内の約物の空きを詰められる場合は、単語を分割せずに残りを行内に収めます。
 
-上は最新の番号付きリリース、下は最新の nightly ビルドを導入します。いずれも
-Kindle PW2以降（Kindle HF を含む）に対応します。両者は同じ KOReader の
-インストール先を使うため、一方を導入するともう一方を置き換えますが、KOReaderの
-設定は維持されます。
+Yomitan 辞書を有効にしている間は常に動作します。行の字間がやや広がることがあり、
+本の描画に少し時間がかかります。詳細は
+[doc/Japanese_line_breaking.md](doc/Japanese_line_breaking.md) を参照してください。
 
-選択したパッケージは Kindle の検索欄から起動できます:
+## 縦書きと漫画
 
-```text
-;kpm launch koreader-tategumi
-;kpm launch koreader-tategumi-nightly
-```
+- `writing-mode: vertical-rl` を含む EPUB は縦書きで表示されます。それ以外の本は
+  **Document → Document settings → Vertical reading** で縦書きにできます（本ごとに保存）。
+- `page-progression-direction="rtl"` の漫画 EPUB と、`ComicInfo.xml` で右開きと
+  指定された CBZ/CBR/CBT は右から左へページをめくります。
+  **メニュー → タップとジェスチャー → ページめくり → ページめくり方向を切り替え**
+  で変更できます。
 
-インストール時には、対応する scriptlet も Kindle のライブラリへ追加されます。
-KUAL が導入済みなら、従来の KOReader メニューからも起動できます。KPM は
-インストール・更新を扱い、KUAL は起動用UIという役割分担です。
+## クレジット
 
-### vanilla KOReader からの移行
-
-旧 zsync 方式のファイル配置型インストールでは、移行専用ファイルを使って
-KOReader の更新メニューから本フォークへ切り替えられます:
-
-1. KOReader を終了し、設定・読書進捗を含む既存の KOReader ディレクトリを
-   バックアップします。
-2. 移行用の **[otamanager.lua](https://github.com/m-tky/koreader-tategumi/releases/latest/download/otamanager.lua)**
-   をダウンロードします（v2026.10 以降のリリースにも添付）。
-   または[移行用ファイル](https://raw.githubusercontent.com/m-tky/koreader-tategumi/master/tools/migration/otamanager.lua)
-   を `otamanager.lua` として保存してください。末尾に `.txt` を付けないでください。
-3. 端末の `<koreader-dir>/frontend/ui/otamanager.lua` にコピーして、既存ファイルを
-   上書きします。
-4. KOReader を再起動し、**メニュー → 更新 → 更新を確認** を選んで、
-   本フォークの安定版への更新を承認します。
-
-更新すると移行用ファイルも本フォークの通常 updater に置き換わります。
-以後も同じメニューから更新できます。移行時は既存の vanilla のサーバー・チャンネル
-設定を無視しますが、保存済みの設定自体は変更しません。同じバージョン番号でも移行できます。
-
-**旧 zsync 方式からの更新は実機で確認済みです。**
-
-使うのは**移行専用ファイル**です。本リポジトリの通常の `frontend/ui/otamanager.lua` は
-旧環境にない kotasync 関連コンポーネントが必要なので、代わりにコピーしないでください。
-kotasync 方式のインストールや移行用ファイルが動かない場合は、上記の端末別手順に従って
-本フォークのパッケージを上書きしてください。既存の `koreader` ディレクトリは削除しないでください。
-ファイル差し替え後に移行を取りやめる場合は、バックアップした元の `otamanager.lua` を
-戻すと vanilla の updater に戻せます。
-
-Boox 端末を含む Android APK 版では、リリースページから本フォークの Android APK を
-インストールしてください。先に設定・読書進捗をバックアップしてください。
-Android が既存アプリへの上書きを拒否する場合も、データをバックアップする前に
-既存アプリをアンインストールしないでください。移行後は、アプリ内で更新を確認し、
-次の APK をダウンロードして Android のインストーラで更新できます。
-
-## Nightly ビルド
-
-タグ付きリリースに加え、毎日（日本時間 5:00 頃）最新の `master` から **nightly**
-ビルドが全対応端末向けに自動生成されます。番号付きリリースに入る前の縦書き
-修正・機能を試せますが、テスト量が少ないため安定性は劣ります。
-
-- **ダウンロード**: ローリング更新の
-  [`nightly` pre-release](https://github.com/m-tky/koreader-tategumi/releases/tag/nightly)
-  （`vYYYY.MM.DD` ラベル）。各ビルドで置き換わるため、リンクは常に最新を指します。
-- **nightly ビルドの OTA**: Kindle、Kobo、PocketBook、Cervantes、reMarkable、
-  および本フォークの Android APK ビルドでは、nightly ビルドを受け取りたい場合に
-  更新チャンネルを Development に切り替えてください:
-  **メニュー → 更新 → 設定 → 更新チャンネル → Development**、続いて
-  **メニュー → 更新 → 更新を確認**。番号付きリリースに戻すには **Stable** に
-  切り替えてください。
-
-## 縦書きの利用方法
-
-CSS に `writing-mode: vertical-rl` が既に含まれている EPUB（市販の日本語小説の
-多くがそうです）は自動的に縦書きで表示されます。
-
-縦書きが指定されていない EPUB は、**Document → Document settings → Vertical reading**
-で縦書きにできます（書籍ごとに保存）。横書き向けのスタイルによっては、正しく表示されない場合があります。
-
-別の方法として、**Document（文書アイコン）→ Style tweaks →
-Book-specific tweak**（長押しで編集）から以下を追加することもできます:
-
-```css
-body { writing-mode: vertical-rl !important; }
-```
-
-## RTL ページ順序の自動検出（漫画・右開き）
-
-日本語の漫画 EPUB や、右から左へのページ順序を持つ CBZ/CBR/CBT コミック
-アーカイブは、初回オープン時に自動検出されます:
-
-- **EPUB**: OPF spine の `page-progression-direction="rtl"` を読み取り
-- **CBZ/CBR/CBT**: `ComicInfo.xml` の標準指定
-  `<Manga>YesAndRightToLeft</Manga>` を読み取り
-  （互換性のため `<ReadingDirection>RTL</ReadingDirection>` と `RightToLeft` にも対応）
-
-`ComicInfo.xml` はアーカイブ直下だけでなくサブディレクトリ内にあっても検出
-されます。名前空間付き XML、UTF-8 BOM、コメント、アーカイブ内パスの大文字・
-小文字の違い、互換値の一般的な区切り・大文字表記の違いにも対応しています。
-
-RTL が検出されると通知が表示されます。物理キーボードの左右矢印を含むページ
-めくりが RTL の読書順序に従い、進捗バーは右（1 ページ目）から左（最終ページ）
-に進みます。
-
-検出された方向は **メニュー → タップとジェスチャー → ページめくり →
-ページめくり方向を切り替え** からいつでも上書きできます。変更内容は本ごとに
-保存され、次回オープン時に上書きされません。
-
-## 既知の制限
-
-- **1 ページ内での書字方向混在**: 縦書き小説に横書きの著者紹介・奥付・広告が
-  混在するようなセクション単位の切り替えは、ページごとに各々の方向で描画
-  されるようになりました。一方、**1 ページ内**に縦書きと横書きを混在させる
-  ケース（縦書き本文中に横書きの表やブロックなど）は未対応で、正しく表示
-  されない場合があります。
-
-- **ルビ間の空白**: ルビグループに隣接する空白文字が EPUB ソースに含まれている
-  場合、ルビと次の文字の間に小さなギャップが残ることがあります。これは EPUB
-  側の仕様であり、レンダリングのバグではありません。
-
-- **段落字下げの二重化**: 一部の EPUB は U+3000（`　` 全角スペース）で字下げを
-  行いますが、CREngine がデフォルトの `text-indent: 1.2em` も適用するため二
-  文字分の字下げになります。本ごとに **Document（文書アイコン）→ Style tweaks
-  → Paragraph first-line indentation → 0**（インデント無し）で修正してください。
-
-## 互換性
-
-本フォークは upstream KOReader の master を追従しているため、その基盤は
-upstream の安定版ではなく **nightly** 相当です。サードパーティプラグインの
-不具合報告は、upstream での検証なしでも歓迎します。ただし本家 upstream
-KOReader nightly でも同様に再現するか併記いただけると振り分けに役立ちます
-— upstream でも壊れているプラグインは本フォークの対象外です。
-
-### 関連プラグイン
-
-以下のプラグインは、本フォークとあわせて利用できるよう整備しています:
-
-- **Bookends** ([m-tky/bookends.koplugin](https://github.com/m-tky/bookends.koplugin)) —
-  設定可能なテキストオーバーレイ。
-  [AndyHazz/bookends.koplugin](https://github.com/AndyHazz/bookends.koplugin) から
-  フォークし、縦書きドキュメントで進捗バーが右→左に進むよう vertical-rl
-  を自動検出します。
-
-- **koreader-skk** ([m-tky/koreader-skk](https://github.com/m-tky/koreader-skk)) —
-  KOReader 向けの SKK 日本語入力プラグインです。KOReader 標準の日本語
-  キーボードではひらがな・カタカナ入力までだったところを、同梱辞書を使った
-  SKK 方式のかな漢字変換に対応させます。物理キーボードとタッチ用の仮想
-  キーボードの両方で利用できます。
-
-## サポート
-
-本縦書きフォークがお役に立った場合、開発を支援していただけると幸いです:
-
-[![GitHub Sponsors](https://img.shields.io/github/sponsors/m-tky?label=Sponsor&logo=GitHub&style=for-the-badge)](https://github.com/sponsors/m-tky)
-
-upstream の KOReader プロジェクト本体については
-[koreader/koreader](https://github.com/koreader/koreader) をご覧ください。
-
-## 謝辞
-
-KOReader は世界中のボランティアが開発する e-ink デバイス向けオープンソース
-電子書籍リーダーです。本フォークの縦書き実装はその成果の上に
-構築されています。本プロジェクトの主要機能・対応フォーマット・開発者向け
-ドキュメントは [upstream KOReader](https://github.com/koreader/koreader) を
-ご参照ください。
+[KOReader](https://github.com/koreader/koreader)（AGPL-3.0）と
+[m-tky/koreader-tategumi](https://github.com/m-tky/koreader-tategumi) をベースに
+しています。Jitendex は CC BY-SA 4.0 で提供され、[EDRDG](https://www.edrdg.org/)
+の JMdict のデータを含みます。
