@@ -20,7 +20,7 @@ defaults:
 
 env:
   MAKEFLAGS: "PARALLEL_JOBS=3 OUTPUT_DIR=build"
-  OTA_BASE_URL: "https://github.com/m-tky/koreader-tategumi/releases/latest/download"
+  OTA_BASE_URL: "${{ github.server_url }}/${{ github.repository }}/releases/latest/download"
   RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref_name }}
 
 jobs:
@@ -545,16 +545,16 @@ jobs:
 
             | Platform | Package |
             |----------|---------|
-            | Kindle (HF, Touch and newer) | [koreader-kindlehf-${{ env.RELEASE_TAG }}.zip](https://github.com/m-tky/koreader-tategumi/releases/download/${{ env.RELEASE_TAG }}/koreader-kindlehf-${{ env.RELEASE_TAG }}.zip) |
-            | Kindle (PW2 / non-HF) | [koreader-kindlepw2-${{ env.RELEASE_TAG }}.zip](https://github.com/m-tky/koreader-tategumi/releases/download/${{ env.RELEASE_TAG }}/koreader-kindlepw2-${{ env.RELEASE_TAG }}.zip) |
-            | Kindle (legacy non-touch) | [koreader-kindle-legacy-${{ env.RELEASE_TAG }}.zip](https://github.com/m-tky/koreader-tategumi/releases/download/${{ env.RELEASE_TAG }}/koreader-kindle-legacy-${{ env.RELEASE_TAG }}.zip) |
-            | Kobo | [koreader-kobo-${{ env.RELEASE_TAG }}.zip](https://github.com/m-tky/koreader-tategumi/releases/download/${{ env.RELEASE_TAG }}/koreader-kobo-${{ env.RELEASE_TAG }}.zip) |
-            | PocketBook | [koreader-pocketbook-${{ env.RELEASE_TAG }}.zip](https://github.com/m-tky/koreader-tategumi/releases/download/${{ env.RELEASE_TAG }}/koreader-pocketbook-${{ env.RELEASE_TAG }}.zip) |
-            | Cervantes | [koreader-cervantes-${{ env.RELEASE_TAG }}.zip](https://github.com/m-tky/koreader-tategumi/releases/download/${{ env.RELEASE_TAG }}/koreader-cervantes-${{ env.RELEASE_TAG }}.zip) |
-            | reMarkable (armhf) | [koreader-remarkable-${{ env.RELEASE_TAG }}.zip](https://github.com/m-tky/koreader-tategumi/releases/download/${{ env.RELEASE_TAG }}/koreader-remarkable-${{ env.RELEASE_TAG }}.zip) |
-            | reMarkable (aarch64) | [koreader-remarkable-aarch64-${{ env.RELEASE_TAG }}.zip](https://github.com/m-tky/koreader-tategumi/releases/download/${{ env.RELEASE_TAG }}/koreader-remarkable-aarch64-${{ env.RELEASE_TAG }}.zip) |
-            | Android (ARM) | [koreader-android-${{ env.RELEASE_TAG }}.apk](https://github.com/m-tky/koreader-tategumi/releases/download/${{ env.RELEASE_TAG }}/koreader-android-${{ env.RELEASE_TAG }}.apk) |
-            | Android (ARM64) | [koreader-android-arm64-${{ env.RELEASE_TAG }}.apk](https://github.com/m-tky/koreader-tategumi/releases/download/${{ env.RELEASE_TAG }}/koreader-android-arm64-${{ env.RELEASE_TAG }}.apk) |
+            | Kindle (HF, Touch and newer) | [koreader-kindlehf-${{ env.RELEASE_TAG }}.zip](${{ github.server_url }}/${{ github.repository }}/releases/download/${{ env.RELEASE_TAG }}/koreader-kindlehf-${{ env.RELEASE_TAG }}.zip) |
+            | Kindle (PW2 / non-HF) | [koreader-kindlepw2-${{ env.RELEASE_TAG }}.zip](${{ github.server_url }}/${{ github.repository }}/releases/download/${{ env.RELEASE_TAG }}/koreader-kindlepw2-${{ env.RELEASE_TAG }}.zip) |
+            | Kindle (legacy non-touch) | [koreader-kindle-legacy-${{ env.RELEASE_TAG }}.zip](${{ github.server_url }}/${{ github.repository }}/releases/download/${{ env.RELEASE_TAG }}/koreader-kindle-legacy-${{ env.RELEASE_TAG }}.zip) |
+            | Kobo | [koreader-kobo-${{ env.RELEASE_TAG }}.zip](${{ github.server_url }}/${{ github.repository }}/releases/download/${{ env.RELEASE_TAG }}/koreader-kobo-${{ env.RELEASE_TAG }}.zip) |
+            | PocketBook | [koreader-pocketbook-${{ env.RELEASE_TAG }}.zip](${{ github.server_url }}/${{ github.repository }}/releases/download/${{ env.RELEASE_TAG }}/koreader-pocketbook-${{ env.RELEASE_TAG }}.zip) |
+            | Cervantes | [koreader-cervantes-${{ env.RELEASE_TAG }}.zip](${{ github.server_url }}/${{ github.repository }}/releases/download/${{ env.RELEASE_TAG }}/koreader-cervantes-${{ env.RELEASE_TAG }}.zip) |
+            | reMarkable (armhf) | [koreader-remarkable-${{ env.RELEASE_TAG }}.zip](${{ github.server_url }}/${{ github.repository }}/releases/download/${{ env.RELEASE_TAG }}/koreader-remarkable-${{ env.RELEASE_TAG }}.zip) |
+            | reMarkable (aarch64) | [koreader-remarkable-aarch64-${{ env.RELEASE_TAG }}.zip](${{ github.server_url }}/${{ github.repository }}/releases/download/${{ env.RELEASE_TAG }}/koreader-remarkable-aarch64-${{ env.RELEASE_TAG }}.zip) |
+            | Android (ARM) | [koreader-android-${{ env.RELEASE_TAG }}.apk](${{ github.server_url }}/${{ github.repository }}/releases/download/${{ env.RELEASE_TAG }}/koreader-android-${{ env.RELEASE_TAG }}.apk) |
+            | Android (ARM64) | [koreader-android-arm64-${{ env.RELEASE_TAG }}.apk](${{ github.server_url }}/${{ github.repository }}/releases/download/${{ env.RELEASE_TAG }}/koreader-android-arm64-${{ env.RELEASE_TAG }}.apk) |
 
             ## Japanese dictionary
 

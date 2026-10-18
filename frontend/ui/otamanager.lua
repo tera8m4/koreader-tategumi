@@ -28,8 +28,8 @@ local OTAManager = {
     ota_servers = {
         -- kotasync and the legacy zsync manifests are co-published here so
         -- builds using either updater can keep updating without a migration.
-        stable  = "https://github.com/m-tky/koreader-tategumi/releases/latest/download/",
-        nightly = "https://github.com/m-tky/koreader-tategumi/releases/download/nightly/",
+        stable  = "https://github.com/tera8m4/koreader-tategumi/releases/latest/download/",
+        nightly = "https://github.com/tera8m4/koreader-tategumi/releases/download/nightly/",
     },
     ota_channels = {
         "stable",

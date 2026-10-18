@@ -17,7 +17,7 @@ env:
   MAKEFLAGS: "PARALLEL_JOBS=3 OUTPUT_DIR=build"
   # OTA base URL for nightly zsync — points to the 'nightly' tagged release.
   # (Cannot use /releases/latest because nightly is a prerelease.)
-  OTA_BASE_URL: "https://github.com/m-tky/koreader-tategumi/releases/download/nightly"
+  OTA_BASE_URL: "${{ github.server_url }}/${{ github.repository }}/releases/download/nightly"
 
 jobs:
 
@@ -559,7 +559,7 @@ jobs:
           prerelease: true
           make_latest: false
           body: |
-            Automatic nightly build — ${{ env.NIGHTLY_VERSION }} — commit [${{ github.sha }}](https://github.com/m-tky/koreader-tategumi/commit/${{ github.sha }})
+            Automatic nightly build — ${{ env.NIGHTLY_VERSION }} — commit [${{ github.sha }}](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})
 
             To enable nightly OTA updates, open KOReader and go to:
             **Menu → Update → Settings → Update channel → Development**
