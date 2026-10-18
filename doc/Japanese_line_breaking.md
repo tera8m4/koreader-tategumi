@@ -243,9 +243,10 @@ koreader:
   priority for 、。.
 - **`lvtinydom.cpp:484` (upstream file, one line):**
   `hash = hash * 31 + JpWords::getHash();`
-- **`crengine/CMakeLists.txt` (one line):** add `src/jpwords.cpp` next to
-  `src/lvfntman_vert.cpp`. Check that koreader-base compiles crengine from
-  this list.
+- **`CMakeLists.txt` and `crengine/CMakeLists.txt` (one line each):** add
+  `jpwords.cpp` next to `lvfntman_vert.cpp`. koreader-base builds crengine
+  from the top-level `CRE_SRCS` list; the other list is for crengine's own
+  builds.
 
 ### koreader-base: `cre.cpp` bindings
 
@@ -364,7 +365,7 @@ Steps:
    - New code goes in fork-only files.
    - Upstream files get only:
      - one line in `lvtinydom.cpp`
-     - one line in `CMakeLists.txt`
+     - one line in each of crengine's two `CMakeLists.txt`
      - one block plus registration lines in `cre.cpp`
      - `base/.gitmodules`
      - the `koreader-cre` lines in `thirdparty/cmake_modules/koreader_targets.cmake`
