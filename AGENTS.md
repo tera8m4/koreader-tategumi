@@ -64,7 +64,7 @@ nix develop --command ./kodev check
 
 The frontend runs on LuaJIT; native components use C/C++ (C11/C++17 toolchains). Do not assume Node or Bun is part of the project runtime. Nix provides LuaJIT, Busted, build tools, and optional lint utilities. The expected host toolchain and platform requirements are documented in `doc/Building.md` and `doc/Building_targets.md`.
 
-This is a nested submodule chain: top-level KOReader → `base` (koreader-base) → `base/thirdparty/kpvcrlib/crengine` (crengine). Do not publish a parent pointer to a child commit unavailable from the child repository's default branch; CI fetches submodules by SHA. For C++ changes, use `scripts/push-chain.sh` to preview or push the chain; its `--dry-run` may still fetch remote refs.
+This is a nested submodule chain: top-level KOReader → `base` (koreader-base) → `base/thirdparty/kpvcrlib/crengine` (crengine). Do not publish a parent pointer to a child commit unavailable from the child repository's default branch; CI fetches submodules by SHA. For C++ changes, use `scripts/push-chain.sh` to preview or push the chain; its `--dry-run` may still fetch remote refs. Push only to repositories under `tera8m4/` (`tera8m4/koreader-tategumi`, `tera8m4/koreader-base`, `tera8m4/crengine`); the `m-tky` and upstream repositories are fetch-only, and `push-chain.sh` refuses other push URLs.
 
 ## Testing & QA
 

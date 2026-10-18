@@ -42,7 +42,34 @@ done
 
 ${DRY} && warn "Dry run — no changes will be made."
 
+# Only push to repositories under github.com/tera8m4/. The submodules
+# get a "tera8m4" remote pointing at the forks tera8m4/{crengine,koreader-base}.
+FORK_OWNER="tera8m4"
+FORK_REMOTE="tera8m4"
+
 # ── helpers ──────────────────────────────────────────────────────────────────
+
+# Add the fork remote to a submodule clone if it is missing.
+ensure_fork_remote() {
+    local dir="$1" repo="$2"
+    [[ -e "${dir}/.git" ]] || return 0 # submodule not checked out
+    git -C "${dir}" remote get-url "${FORK_REMOTE}" >/dev/null 2>&1 && return 0
+    if ${DRY}; then
+        warn "${dir}: no '${FORK_REMOTE}' remote (would add git@github.com:${FORK_OWNER}/${repo}.git)"
+    else
+        git -C "${dir}" remote add "${FORK_REMOTE}" "git@github.com:${FORK_OWNER}/${repo}.git"
+    fi
+}
+
+# Refuse to push anywhere outside github.com/${FORK_OWNER}/.
+check_push_url() {
+    local dir="$1" remote="$2" url
+    url=$(git -C "${dir}" remote get-url --push "${remote}" 2>/dev/null) || die "${dir}: no remote '${remote}'"
+    [[ "${url}" =~ github\.com[:/]${FORK_OWNER}/ ]] || die "${dir}: remote '${remote}' (${url}) is not under ${FORK_OWNER}/"
+}
+
+ensure_fork_remote "${CRENGINE_DIR}" crengine
+ensure_fork_remote "${BASE_DIR}" koreader-base
 
 # Print commits ahead of remote/master.
 show_ahead() {
@@ -65,6 +92,7 @@ show_ahead() {
 # the caller's `$(...)` capture only sees the SHA.
 push_onto_remote_master() {
     local dir="$1" remote="$2" sub_path="${3:-}" sub_sha="${4:-}"
+    check_push_url "${dir}" "${remote}"
 
     # Run internal commands with stdout silenced (>/dev/null) where the
     # output would otherwise leak into our `echo "$pushed_sha"` return.
@@ -176,12 +204,12 @@ push_onto_remote_master() {
 
 if ${DRY}; then
     if [[ "${START}" == "crengine" ]]; then
-        info "crengine (mytky → master):"
-        show_ahead "${CRENGINE_DIR}" mytky
+        info "crengine (${FORK_REMOTE} → master):"
+        show_ahead "${CRENGINE_DIR}" "${FORK_REMOTE}"
     fi
     if [[ "${START}" != "koreader" ]]; then
-        info "koreader-base (mytky → master):"
-        show_ahead "${BASE_DIR}" mytky
+        info "koreader-base (${FORK_REMOTE} → master):"
+        show_ahead "${BASE_DIR}" "${FORK_REMOTE}"
     fi
     info "koreader-tategumi (origin → master):"
     show_ahead "${ROOT}" origin
@@ -195,13 +223,13 @@ base_sha=""
 
 if [[ "${START}" == "crengine" ]]; then
     info "Pushing crengine…"
-    crengine_sha=$(push_onto_remote_master "${CRENGINE_DIR}" mytky)
+    crengine_sha=$(push_onto_remote_master "${CRENGINE_DIR}" "${FORK_REMOTE}")
     info "  → ${crengine_sha}"
 fi
 
 if [[ "${START}" != "koreader" ]]; then
     info "Pushing koreader-base…"
-    base_sha=$(push_onto_remote_master "${BASE_DIR}" mytky \
+    base_sha=$(push_onto_remote_master "${BASE_DIR}" "${FORK_REMOTE}" \
         "thirdparty/kpvcrlib/crengine" "${crengine_sha}")
     info "  → ${base_sha}"
 fi

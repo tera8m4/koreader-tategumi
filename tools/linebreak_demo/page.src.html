@@ -1,0 +1,793 @@
+<title>Tategumi Line Breaks</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Noto+Serif+JP:wght@400;600&family=Shippori+Mincho:wght@600;700&display=swap">
+<style>
+/* Layout: one control bar, then four stacked "galleys" of vertical columns read right to left, then reference notes. */
+:root {
+  --bg: #f3f5f7;
+  --surface: #ffffff;
+  --ink: #1b2027;
+  --muted: #5b6573;
+  --line: #d6dce4;
+  --accent: #2c4a80;
+  --bad: #c42f2f;
+  --sq: #b8700c;
+  --hang: #13808a;
+  --moved: #3a8a3d;
+  --split: #8a4fc9;
+  --col: #eef1f5;
+  --font-ui: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --font-ja: "Noto Serif JP", "Hiragino Mincho ProN", "Yu Mincho", "YuMincho", serif;
+  --font-display: "Shippori Mincho", "Noto Serif JP", "Yu Mincho", serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111419; --surface: #191d24; --ink: #e6e9ee; --muted: #98a2b0; --line: #2b323c;
+    --accent: #93acdf; --bad: #f07070; --sq: #e8a23e; --hang: #4cc3cb; --moved: #78c87b; --split: #b892f0; --col: #20262f;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111419; --surface: #191d24; --ink: #e6e9ee; --muted: #98a2b0; --line: #2b323c;
+  --accent: #93acdf; --bad: #f07070; --sq: #e8a23e; --hang: #4cc3cb; --moved: #78c87b; --split: #b892f0; --col: #20262f;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--font-ui); font-size: 15px; line-height: 1.55;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 48px;
+}
+.wrap { max-width: 1120px; margin: 32px auto 0; display: grid; gap: 18px; }
+.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); padding-block: 10px 8px; display: grid; gap: 8px; }
+h1 { font-family: var(--font-display); font-size: 20px; line-height: 1.2; margin: 0; white-space: nowrap; }
+h1 span { color: var(--accent); }
+h2 { font-family: var(--font-display); font-size: 22px; margin: 0; text-wrap: balance; }
+h3 { font-size: 16px; margin: 0; font-weight: 600; }
+p { margin: 0; }
+.lede { max-width: 68ch; color: var(--muted); }
+.intro { display: grid; gap: 10px; }
+
+.controls {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+  padding: 8px 12px; display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center;
+}
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+.seg { display: flex; flex-wrap: wrap; gap: 4px; }
+.seg button {
+  font: inherit; font-size: 14px; border: 1px solid var(--line); background: transparent; color: var(--ink);
+  padding: 5px 10px; border-radius: 6px; cursor: pointer;
+}
+.seg button .ja { font-family: var(--font-ja); }
+.seg button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--surface); }
+.seg button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.len { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1 1 260px; }
+.len label { font-size: 13px; color: var(--muted); white-space: nowrap; }
+.len input { flex: 1; min-width: 0; accent-color: var(--accent); }
+.len output { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 14px; min-width: 5.5ch; }
+.custom { flex-basis: 100%; }
+.custom textarea {
+  width: 100%; min-height: 84px; font-family: var(--font-ja); font-size: 15px; line-height: 1.7;
+  background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; resize: vertical;
+}
+.custom small { color: var(--muted); font-size: 12px; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.sw { width: 14px; height: 14px; border-radius: 3px; display: inline-block; }
+.sw.bad { background: color-mix(in srgb, var(--bad) 30%, transparent); box-shadow: inset 0 0 0 1px var(--bad); }
+.sw.sq { background: color-mix(in srgb, var(--sq) 30%, transparent); box-shadow: inset 0 0 0 1px var(--sq); }
+.sw.hang { background: color-mix(in srgb, var(--hang) 30%, transparent); box-shadow: inset 0 0 0 1px var(--hang); }
+.sw.moved { background: color-mix(in srgb, var(--moved) 30%, transparent); box-shadow: inset 0 0 0 1px var(--moved); }
+
+.panels { display: grid; gap: 10px; }
+@media (min-width: 900px) { .panels { grid-template-columns: 1fr 1fr; } }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; min-width: 0; }
+.panel header { padding: 7px 12px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; border-bottom: 1px solid var(--line); }
+.panel h3 { font-size: 14.5px; }
+.panel .ja { font-family: var(--font-ja); color: var(--muted); font-size: 13px; }
+.how dl { margin: 0; display: grid; gap: 4px; }
+.how dt { font-weight: 600; font-size: 14px; margin-top: 6px; }
+.how dd { margin: 0; font-size: 14px; color: var(--muted); max-width: 90ch; }
+.chips { display: flex; flex-wrap: wrap; gap: 5px; list-style: none; margin: 0 0 0 auto; padding: 0; }
+.chips li {
+  font-size: 12px; border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.chips li b { color: var(--ink); font-weight: 600; font-family: var(--font-mono); font-size: 12.5px; }
+.chips li.bad { border-color: var(--bad); color: var(--bad); }
+.chips li.bad b { color: var(--bad); }
+.chips li.good { border-color: var(--moved); }
+.chips li.good b { color: var(--moved); }
+
+.stage { overflow-x: auto; padding: 2px 0 4px; }
+.cols { position: relative; font-family: var(--font-ja); font-size: var(--fs, 21px); margin-left: auto; }
+.colbg { position: absolute; top: .6em; width: 1em; background: var(--col); border-bottom: 2px dashed var(--line); }
+.g {
+  position: absolute; width: 1em; height: 1em; line-height: 1em; writing-mode: vertical-rl;
+  text-align: center; border-radius: 3px; color: var(--ink);
+}
+.g.bad { background: color-mix(in srgb, var(--bad) 26%, transparent); box-shadow: inset 0 0 0 1px var(--bad); }
+.g.sq { background: color-mix(in srgb, var(--sq) 24%, transparent); }
+.g.hang { background: color-mix(in srgb, var(--hang) 26%, transparent); }
+.g.moved { background: color-mix(in srgb, var(--moved) 22%, transparent); }
+.adj {
+  position: absolute; text-align: center; font-family: var(--font-mono); line-height: 1.2;
+  color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.adj span { font-size: .5em; }
+.g.split { background: color-mix(in srgb, var(--split) 28%, transparent); box-shadow: inset 0 0 0 1px var(--split); }
+.sw.split { background: color-mix(in srgb, var(--split) 30%, transparent); box-shadow: inset 0 0 0 1px var(--split); }
+.chips li.split { border-color: var(--split); color: var(--split); }
+.chips li.split b { color: var(--split); }
+.len.keep { flex: 0 0 auto; }
+.chk { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+.chk .ja { font-family: var(--font-ja); }
+.show { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex-basis: 100%; }
+.show .seg button { font-size: 12.5px; padding: 3px 8px; }
+.phr .wd + .wd::before { content: "·"; color: var(--muted); margin: 0 1px; }
+.len select { font: inherit; font-size: 13px; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; }
+@media (min-width: 1400px) { .panels { grid-template-columns: 1fr 1fr 1fr; } }
+.adj.plus { color: var(--accent); }
+.adj.minus { color: var(--sq); }
+.adj.hang { color: var(--hang); }
+.adj.bad { color: var(--bad); }
+
+.ref { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: grid; gap: 10px; align-content: start; min-width: 0; }
+.card p, .card li { font-size: 14px; color: var(--muted); }
+.card ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+.card .jt { font-family: var(--font-ja); color: var(--ink); }
+.tbl { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-weight: 500; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+td.c { font-family: var(--font-ja); font-size: 18px; color: var(--ink); white-space: nowrap; }
+td { color: var(--muted); }
+.bar { display: inline-flex; height: 12px; width: 48px; border: 1px solid var(--line); border-radius: 2px; overflow: hidden; vertical-align: middle; }
+.bar i { display: block; height: 100%; }
+.bar .k { background: var(--ink); opacity: .75; }
+.bar .s { background: repeating-linear-gradient(135deg, var(--sq) 0 2px, transparent 2px 5px); }
+.bar .f { background: repeating-linear-gradient(135deg, var(--muted) 0 2px, transparent 2px 5px); opacity: .6; }
+.phr { font-family: var(--font-ja); font-size: 16px; line-height: 2.1; color: var(--ink); }
+.phr .ph { border-bottom: 2px solid color-mix(in srgb, var(--accent) 55%, transparent); padding: 0 1px; margin-right: 6px; }
+.phr .pb { display: block; height: 6px; }
+.status { font-size: 12.5px; color: var(--muted); }
+.note { font-size: 13px; color: var(--muted); max-width: 90ch; }
+code { font-family: var(--font-mono); font-size: .92em; }
+
+@media (max-width: 560px) {
+  body { font-size: 14px; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .seg button { transition: background .15s, color .15s; }
+}
+</style>
+
+<div class="top">
+  <div class="controls" role="group" aria-label="Text and column length">
+    <h1>Tategumi line breaks <span>縦組みの改行</span></h1>
+    <div class="seg" id="samples">
+      <button type="button" data-k="bocchan" aria-pressed="true"><span class="ja">坊っちゃん</span></button>
+      <button type="button" data-k="rashomon" aria-pressed="false"><span class="ja">羅生門</span></button>
+      <button type="button" data-k="melos" aria-pressed="false"><span class="ja">走れメロス</span></button>
+      <button type="button" data-k="custom" aria-pressed="false">Your text</button>
+    </div>
+    <div class="len">
+      <label for="len">Column length</label>
+      <input id="len" type="range" min="7" max="34" step="1" value="14">
+      <output id="lenOut" for="len">14 em</output>
+    </div>
+    <div class="len keep">
+      <label for="minKeep">Keep together</label>
+      <select id="minKeep">
+        <option value="2" selected>2 letters</option>
+        <option value="3">3 letters</option>
+      </select>
+    </div>
+    <label class="chk"><input type="checkbox" id="idioms"> Idioms as one word <span class="ja">(腰を抜かす)</span></label>
+    <div class="show" role="group" aria-label="Methods shown">
+      <span class="status">Show</span>
+      <div class="seg" id="show"></div>
+    </div>
+    <div class="custom" id="customBox" hidden>
+      <label for="text" class="status">Paste Japanese text. A line break starts a new paragraph.</label>
+      <textarea id="text" spellcheck="false"></textarea>
+    </div>
+  </div>
+
+  <div class="legend" aria-label="Legend">
+    <span><i class="sw bad"></i>Breaks a kinsoku rule (禁則違反)</span>
+    <span><i class="sw moved"></i>Pushed to this column (追い出し)</span>
+    <span><i class="sw sq"></i>Space squeezed (追い込み)</span>
+    <span><i class="sw hang"></i>Hangs below the column (ぶら下げ)</span>
+    <span><i class="sw split"></i>Word split badly (泣き別れ)</span>
+    <span>Under each column: <b>+</b> space added, <b>−</b> space squeezed, <b>↓</b> hanging, <b>□</b> left empty</span>
+  </div>
+</div>
+
+<main class="panels" id="panels"></main>
+
+<div class="wrap">
+  <div class="card how">
+    <h2>How each method breaks</h2>
+    <dl>
+      <dt>1. No rules <span class="jt">禁則なし</span></dt>
+      <dd>Fill the column, break after the last character that fits, then spread the leftover space. Punctuation and closing brackets can land at the top of a column.</dd>
+      <dt>2. Push out, like this reader <span class="jt">ぶら下げ＋追い出し</span></dt>
+      <dd>Fill the column. If the break lands on a forbidden spot, let a 、 or 。 hang below the column, otherwise push characters back to the next column, then stretch the spacing to fill. This is what <code>processParagraphVertical</code> does.</dd>
+      <dt>3. JIS X 4051 / JLReq <span class="jt">追い込み優先</span></dt>
+      <dd>Before stretching, try to pull the next character in by squeezing the half-em spaces that come with 、 」 「 ・. Push out only when there is not enough of that space. No hanging punctuation.</dd>
+      <dt>4. BudouX phrases <span class="jt">文節で改行</span></dt>
+      <dd>Break only between the phrases BudouX finds, so no word is split across columns. Columns are left ragged instead of stretched, as with CSS <code>word-break: auto-phrase</code>. A phrase longer than the column is split, keeping word ends together as in 5.</dd>
+      <dt>5. Keep BudouX phrases <span class="jt">泣き別れ防止（文節）</span></dt>
+      <dd>Method 3, but each possible break gets a cost: 0 between phrases, 1.5 inside a phrase right before a kanji (飛び|降りる), 3 before a particle (事|が), 8 inside okurigana (飛び降|りる), 20 if fewer than the chosen number of letters stay on one side (沈めてい|く), plus 1 for every em of space the column has to absorb. Squeezing the rest of the phrase in costs 0.3. The cheapest break wins.</dd>
+      <dt>6. Keep Yomitan words <span class="jt">泣き別れ防止（単語）</span></dt>
+      <dd>The same rule, but the units are dictionary words found with Yomitan's deinflection rules and your JMdict: 沈めて · いく · と. Breaking between a word and its particle (事|が) is allowed, so columns stay tighter, but a column can start with a lone particle.</dd>
+      <dt>7. Keep Yomitan words + particles <span class="jt">泣き別れ防止（単語＋助詞）</span></dt>
+      <dd>The same, with short particles, auxiliaries and the copula (up to 2 letters: が, を, かも, だ) attached to the word before them (事が). This is the proposed default for the reader: no lone mora, no okurigana split and, when it is cheap enough, no lone particle at the top of a column.</dd>
+    </dl>
+  </div>
+
+  <div class="ref">
+    <div class="card">
+      <h2>What BudouX sees</h2>
+      <p>BudouX is a small machine-learning model from Google that splits Japanese into phrases (文節). Each underlined run below is one phrase; panel 4 only breaks between them.</p>
+      <div class="phr" id="phrases"></div>
+      <p class="status" id="budouxStatus">Loading BudouX…</p>
+    </div>
+    <div class="card">
+      <h2>What Yomitan sees</h2>
+      <p>Dictionary words from your JMdict, found with the Yomitan plugin's deinflection rules. Each underlined run is a word plus the particles after it (panel 7); dots separate the words inside it (panel 6).</p>
+      <div class="phr" id="ymWords"></div>
+      <p class="status" id="ymStatus">Loading JMdict…</p>
+    </div>
+    <div class="card">
+      <h2>The JLReq spacing model</h2>
+      <p>Punctuation glyphs are drawn in half an em; the other half is space that JLReq lets the typesetter squeeze or keep.</p>
+      <div class="tbl">
+        <table>
+          <thead><tr><th>Char</th><th>Width</th><th>Space</th><th>Squeezable?</th></tr></thead>
+          <tbody>
+            <tr><td class="c">漢 か</td><td><span class="bar"><i class="k" style="width:100%"></i></span></td><td>none</td><td>no</td></tr>
+            <tr><td class="c">、 ，</td><td><span class="bar"><i class="k" style="width:50%"></i><i class="s" style="width:50%"></i></span></td><td>½ after</td><td>yes, to 0</td></tr>
+            <tr><td class="c">」 』 ）</td><td><span class="bar"><i class="k" style="width:50%"></i><i class="s" style="width:50%"></i></span></td><td>½ after</td><td>yes, to 0</td></tr>
+            <tr><td class="c">「 『 （</td><td><span class="bar"><i class="s" style="width:50%"></i><i class="k" style="width:50%"></i></span></td><td>½ before</td><td>yes, to 0</td></tr>
+            <tr><td class="c">・ ：</td><td><span class="bar"><i class="s" style="width:25%"></i><i class="k" style="width:50%"></i><i class="s" style="width:25%"></i></span></td><td>¼ each side</td><td>yes, to 0</td></tr>
+            <tr><td class="c">。 ．</td><td><span class="bar"><i class="k" style="width:50%"></i><i class="f" style="width:50%"></i></span></td><td>½ after</td><td>kept, except at column end</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Neighbouring spaces merge: <span class="jt">、「</span> share one half-em, and <span class="jt">。」</span> get none between them.</p>
+    </div>
+    <div class="card">
+      <h2>Kinsoku rules used here</h2>
+      <ul>
+        <li>Never at the top of a column (行頭禁則): <span class="jt">、。，．」』）】・：；！？ぁぃぅぇぉっゃゅょァィゥェォッャュョーゝゞ々</span></li>
+        <li>Never at the bottom of a column (行末禁則): <span class="jt">「『（【〔〈《</span></li>
+        <li>Never split (分離禁止): <span class="jt">……　――</span></li>
+      </ul>
+      <p>The adjustment order in panel 3 follows JIS X 4051 and the W3C “Requirements for Japanese Text Layout”: squeeze in first (追い込み), push out only if that fails (追い出し), and stretch what remains evenly.</p>
+    </div>
+  </div>
+
+  <p class="note">Simplified model: every kanji and kana is one em, punctuation is half an em plus its space, and there is no ruby, Latin text or hyphenation. The panels show how each rule decides the break; the real renderer measures actual glyph advances.</p>
+</div>
+
+<script>
+const SAMPLES = /*SAMPLES*/null;
+const PRE = /*PHRASES*/null;
+const YM_TRANSFORMS = /*TRANSFORMS*/null;
+const YM_WORDS = /*WORDS*/null;
+
+// ---- character classes (JLReq, simplified) ----
+const C = new Map();
+const put = (s, k) => { for (const c of s) C.set(c, k); };
+put("「『（【〔〈《“‘［｛", "open");
+put("」』）】〕〉》”’］｝", "close");
+put("。．", "stop");
+put("、，", "comma");
+put("・：；", "middle");
+put("！？", "excl");
+put("ぁぃぅぇぉっゃゅょゎゕゖァィゥェォッャュョヮヵヶーゝゞヽヾ々〻", "small");
+put("…‥―—", "insep");
+const cls = c => C.get(c) || "normal";
+const HALF = new Set(["open", "close", "stop", "comma", "middle"]);
+const ENDERS = new Set(["close", "stop", "comma"]);
+const NOSTART = new Set(["close", "stop", "comma", "middle", "excl", "small"]);
+const HANGABLE = new Set(["、", "。", "，", "．"]);
+const EPS = 1e-6;
+
+const ink = c => HALF.has(cls(c)) ? 0.5 : 1;
+const inkOffset = c => { const k = cls(c); return k === "open" ? 0.5 : k === "middle" ? 0.25 : 0; };
+const glueBefore = c => { const k = cls(c); return k === "open" ? 0.5 : k === "middle" ? 0.25 : 0; };
+const glueAfter = c => { const k = cls(c); return ENDERS.has(k) ? 0.5 : k === "middle" ? 0.25 : 0; };
+
+function gap(a, b) {
+  const ka = cls(a), kb = cls(b);
+  if (ENDERS.has(ka) && ENDERS.has(kb)) return 0;   // 。」
+  if (ka === "open" && kb === "open") return 0;      // 「『
+  const ga = glueAfter(a), gb = glueBefore(b);
+  if (ga > 0 && gb > 0) return 0.5;                  // 、「 share one half-em
+  return ga + gb;
+}
+function gapShrink(a, b) {
+  const g = gap(a, b);
+  if (!g) return 0;
+  if (cls(a) === "stop" && glueBefore(b) === 0) return 0; // keep the space after 。
+  return g;
+}
+const noStart = c => NOSTART.has(cls(c));
+const noEnd = c => cls(c) === "open";
+function breakable(ch, i) {
+  if (i <= 0 || i >= ch.length) return true;
+  const a = ch[i - 1], b = ch[i];
+  if (noStart(b) || noEnd(a)) return false;
+  if (cls(a) === "insep" && cls(b) === "insep") return false;
+  return true;
+}
+
+// ---- measuring ----
+const lead = (ch, s, ps) => ps ? (cls(ch[s]) === "open" ? 0.5 : 1) : 0; // paragraph indent
+function natural(ch, s, e, ps) {
+  let t = lead(ch, s, ps);
+  for (let i = s; i < e; i++) {
+    t += ink(ch[i]);
+    if (i > s) t += gap(ch[i - 1], ch[i]);
+  }
+  return t; // the space after the last character is dropped at the column end
+}
+function shrinkable(ch, s, e) {
+  let t = 0;
+  for (let i = s + 1; i < e; i++) t += gapShrink(ch[i - 1], ch[i]);
+  return t;
+}
+function fill(ch, s, ps, L) {
+  let e = s + 1;
+  while (e < ch.length && natural(ch, s, e + 1, ps) <= L + EPS) e++;
+  return e;
+}
+function pushBack(ch, s, e) {
+  let k = e;
+  while (k > s + 1 && !breakable(ch, k)) k--;
+  return k;
+}
+
+// ---- the four break rules ----
+const BREAK = {
+  none(ch, s, ps, L) {
+    return { e: fill(ch, s, ps, L) };
+  },
+  fork(ch, s, ps, L) {
+    const e = fill(ch, s, ps, L);
+    if (e >= ch.length || breakable(ch, e)) return { e };
+    if (HANGABLE.has(ch[e]) && breakable(ch, e + 1)) return { e: e + 1, hang: true };
+    const k = pushBack(ch, s, e);
+    return { e: k, pushed: e - k };
+  },
+  jis(ch, s, ps, L) {
+    const e = fill(ch, s, ps, L);
+    if (e >= ch.length) return { e };
+    if (Math.abs(natural(ch, s, e, ps) - L) < EPS && breakable(ch, e)) return { e };
+    for (let f = e + 1; f <= Math.min(ch.length, e + 2); f++) {
+      if (f < ch.length && !breakable(ch, f)) continue;
+      const need = natural(ch, s, f, ps) - L;
+      if (need <= shrinkable(ch, s, f) + EPS) return { e: f, squeeze: true };
+      break;
+    }
+    const k = pushBack(ch, s, e);
+    return { e: k, pushed: e - k };
+  },
+  phrase(ch, s, ps, L, info) {
+    const e = fill(ch, s, ps, L);
+    if (e >= ch.length) return { e };
+    if (info) {
+      let k = e;
+      while (k > s && info.pStart[k] < k) k--;
+      if (k > s) return { e: k };
+      // The phrase is longer than the column: split it, keeping word ends together.
+      return { e: keepEnds(ch, s, pushBack(ch, s, e), info) };
+    }
+    return { e: pushBack(ch, s, e) };
+  },
+  // JLReq adjustment, but never leave fewer than state.minKeep letters of a
+  // phrase on either side of the break (泣き別れ).
+  keep(ch, s, ps0, L, info) {
+    const r = BREAK.jis(ch, s, ps0, L);
+    if (!info || r.e >= ch.length || splitCost(ch, r.e, info) === 0) return r;
+    // Candidates: the JLReq break, squeezing the rest of the unit in, or any
+    // earlier break. Cost = how bad the split is + em of space the column gains.
+    const fillE = fill(ch, s, ps0, L);
+    let best = { e: r.e, squeeze: r.squeeze, cost: splitCost(ch, r.e, info) + gain(ch, s, r.e, ps0, L) };
+    let f = info.pEnd[r.e];
+    while (f < ch.length && !breakable(ch, f)) f++;
+    if (natural(ch, s, f, ps0) - L <= shrinkable(ch, s, f) + EPS) {
+      const c = 0.3 + splitCost(ch, f, info);
+      if (c < best.cost) best = { e: f, squeeze: true, cost: c };
+    }
+    for (let k = r.e - 1; k > s; k--) {
+      if (!breakable(ch, k)) continue;
+      const c = splitCost(ch, k, info) + gain(ch, s, k, ps0, L);
+      if (c < best.cost) best = { e: k, cost: c };
+    }
+    if (best.e === r.e) return r;
+    return { e: best.e, squeeze: !!best.squeeze, pushed: best.squeeze ? 0 : Math.max(0, fillE - best.e) };
+  },
+};
+
+// How bad is a column break at k (between ch[k-1] and ch[k])? 0 between units;
+// inside a unit: 1.5 right before a kanji (飛び|降りる), 3 before a particle or
+// auxiliary (事|が), 8 inside okurigana or an inflection (飛び降|りる), 20 when
+// fewer than state.minKeep letters stay on one side (沈めてい|く).
+const KANJI = /[\u3400-\u9FFF\uF900-\uFAFF]/;
+function splitCost(ch, k, info) {
+  if (k <= 0 || k >= ch.length || info.pStart[k] === k) return 0;
+  const MIN = state.minKeep;
+  // Letters on each side, counted up to the nearest punctuation (救うの|だ。」と: 1 after)
+  let head = 0, tail = 0;
+  for (let i = k - 1; i >= info.pStart[k] && !PUNCT.has(cls(ch[i])); i--) head++;
+  for (let i = k; i < info.pEnd[k] && !PUNCT.has(cls(ch[i])); i++) tail++;
+  if (head < MIN || tail < MIN) return 20;
+  if (KANJI.test(ch[k])) return 1.5;
+  if (info.word && info.word.pStart[k] === k) return 3;
+  return 8;
+}
+const isSplit = (ch, k, info) => splitCost(ch, k, info) >= 8; // okurigana split or lone kana
+// Space (em) a justified column gains when it ends at k.
+const gain = (ch, s, k, ps, L) => Math.max(0, L - natural(ch, s, k, ps));
+
+// Ragged layout fallback: the least bad break at or before e.
+function keepEnds(ch, s, e, info) {
+  let best = e, bc = splitCost(ch, e, info);
+  for (let k = e - 1; k > s && bc > 0; k--) {
+    if (!breakable(ch, k)) continue;
+    const c = splitCost(ch, k, info);
+    if (c < bc) { best = k; bc = c; }
+  }
+  return best;
+}
+
+const PUNCT = new Set(["open", "close", "stop", "comma", "middle", "excl"]);
+function letters(ch, a, b) {
+  let n = 0;
+  for (let i = a; i < b; i++) if (!PUNCT.has(cls(ch[i]))) n++;
+  return n;
+}
+
+function paragraphs(text) {
+  return text.split(/\n+/).map(t => t.trim()).filter(Boolean);
+}
+// For each character index, the start and end of the BudouX phrase containing it.
+function phraseInfo(phr, n) {
+  if (!phr) return null;
+  const pStart = new Array(n + 1), pEnd = new Array(n + 1);
+  let i = 0;
+  for (const p of phr) {
+    const len = Array.from(p).length;
+    for (let k = i; k < i + len; k++) { pStart[k] = i; pEnd[k] = i + len; }
+    i += len;
+  }
+  if (i !== n) return null;
+  pStart[n] = n; pEnd[n] = n;
+  return { pStart, pEnd };
+}
+
+function layout(paras, mode, L, breakSegs, markSegs, wordSegs) {
+  const lines = [];
+  paras.forEach((par, pi) => {
+    const ch = Array.from(par);
+    const info = phraseInfo(breakSegs && breakSegs[pi], ch.length);
+    const mark = phraseInfo(markSegs && markSegs[pi], ch.length);
+    if (wordSegs) {
+      const w = phraseInfo(wordSegs[pi], ch.length);
+      if (info) info.word = w;
+      if (mark) mark.word = w;
+    }
+    let s = 0, pushedIn = 0;
+    while (s < ch.length) {
+      const ps = s === 0;
+      const r = BREAK[mode](ch, s, ps, L, info);
+      const e = Math.max(s + 1, Math.min(r.e, ch.length));
+      lines.push({ ch, s, e, ps, info, mark, last: e >= ch.length, hang: !!r.hang, squeeze: !!r.squeeze, pushedIn });
+      pushedIn = r.pushed || 0;
+      s = e;
+    }
+  });
+  return lines;
+}
+
+// Place the glyphs of one column; returns positions (em from column top) and the adjustment.
+function place(line, L, justify) {
+  const { ch, s, e, ps } = line;
+  const bodyEnd = line.hang ? e - 1 : e;
+  const N = natural(ch, s, bodyEnd, ps);
+  const nGaps = bodyEnd - s - 1;
+  let perGap = 0, shrinkF = 0, adj = 0;
+  if (justify && !line.last && nGaps > 0) {
+    if (N < L - EPS) { perGap = (L - N) / nGaps; adj = L - N; }
+    else if (N > L + EPS) {
+      const tot = shrinkable(ch, s, bodyEnd);
+      if (tot > 0) { shrinkF = Math.min(1, (N - L) / tot); adj = -(N - L); }
+    }
+  }
+  const glyphs = [];
+  let cur = lead(ch, s, ps);
+  for (let i = s; i < e; i++) {
+    const c = ch[i];
+    const g = { c, top: 0, f: [] };
+    if (i > s) {
+      let sp = gap(ch[i - 1], c);
+      if (i < bodyEnd) {
+        sp += perGap;
+        const sh = gapShrink(ch[i - 1], c) * shrinkF;
+        if (sh > EPS) {
+          sp -= sh;
+          (glueAfter(ch[i - 1]) > 0 ? glyphs[glyphs.length - 1] : g).f.push("sq");
+        }
+      }
+      cur += sp;
+    }
+    g.top = cur - inkOffset(c);
+    cur += ink(c);
+    if (i >= bodyEnd) g.f.push("hang");
+    if (i - s < line.pushedIn) g.f.push("moved");
+    glyphs.push(g);
+  }
+  // kinsoku violations
+  let bad = false;
+  if (s > 0 && noStart(ch[s])) { glyphs[0].f.push("bad"); bad = true; }
+  if (!line.last && !line.hang) {
+    const a = ch[e - 1], b = ch[e];
+    if (noEnd(a) || (cls(a) === "insep" && cls(b) === "insep")) { glyphs[glyphs.length - 1].f.push("bad"); bad = true; }
+  }
+  // 泣き別れ: a unit split at a forbidden point (see okInside)
+  let split = false;
+  const info = line.mark;
+  if (info) {
+    if (s > 0 && isSplit(ch, s, info)) {
+      for (let i = s; i < Math.min(info.pEnd[s], e); i++) glyphs[i - s].f.push("split");
+      split = true;
+    }
+    if (!line.last && isSplit(ch, e, info)) {
+      for (let i = Math.max(info.pStart[e], s); i < e; i++) glyphs[i - s].f.push("split");
+      split = true;
+    }
+  }
+  return { glyphs, adj, N, bad, split };
+}
+
+const esc = s => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const num = x => (Math.round(x * 100) / 100).toString().replace(/^0\./, ".");
+
+const PANELS = [
+  { id: "p-none", n: 1, title: "No rules", ja: "禁則なし", mode: "none", justify: true, seg: null, show: false },
+  { id: "p-fork", n: 2, title: "Reader today", ja: "ぶら下げ＋追い出し", mode: "fork", justify: true, seg: null, show: true },
+  { id: "p-jis", n: 3, title: "JLReq", ja: "追い込み優先", mode: "jis", justify: true, seg: null, show: false },
+  { id: "p-phrase", n: 4, title: "BudouX phrases, ragged", ja: "文節で改行", mode: "phrase", justify: false, seg: "budoux", show: false },
+  { id: "p-keep", n: 5, title: "Keep BudouX phrases", ja: "泣き別れ防止（文節）", mode: "keep", justify: true, seg: "budoux", show: true },
+  { id: "p-words", n: 6, title: "Keep Yomitan words", ja: "泣き別れ防止（単語）", mode: "keep", justify: true, seg: "words", show: true },
+  { id: "p-units", n: 7, title: "Keep Yomitan words + particles", ja: "泣き別れ防止（単語＋助詞）", mode: "keep", justify: true, seg: "units", show: true },
+];
+
+function buildPanels() {
+  document.getElementById("panels").innerHTML = PANELS.map(p => `<section class="panel" id="${p.id}"${p.show ? "" : " hidden"}>
+    <header><h3>${p.n}. ${p.title}</h3><span class="ja">${p.ja}</span><ul class="chips"></ul></header>
+    <div class="stage" dir="rtl"></div>
+  </section>`).join("");
+  document.getElementById("show").innerHTML = PANELS.map(p =>
+    `<button type="button" data-id="${p.id}" aria-pressed="${p.show}">${p.n}. ${p.title}</button>`).join("");
+}
+
+function drawPanel(panel, paras, L, segs) {
+  const root = document.getElementById(panel.id);
+  if (root.hidden) return;
+  const breakSegs = panel.seg ? segs[panel.seg] : null;
+  // Split word ends are marked by the panel's own units, else by words + particles.
+  const markSegs = breakSegs || segs.units || segs.budoux;
+  const lines = layout(paras, panel.mode, L, breakSegs, markSegs, segs.words);
+  const pitch = 1.8, top = 0.6;
+  const W = lines.length * pitch + 0.4, H = top + L + 1.9;
+  let html = `<div class="cols" style="width:${W}em;height:${H}em">`;
+  let bad = 0, squeezed = 0, hung = 0, pushed = 0, loosest = 0, raggedSum = 0, raggedN = 0, splits = 0;
+  lines.forEach((line, k) => {
+    const x = 0.2 + k * pitch + (pitch - 1) / 2;
+    html += `<div class="colbg" style="right:${x}em;height:${L}em"></div>`;
+    const r = place(line, L, panel.justify);
+    for (const g of r.glyphs) {
+      html += `<span class="g ${g.f.join(" ")}" style="right:${x}em;top:${(g.top + top).toFixed(3)}em">${esc(g.c)}</span>`;
+    }
+    let label = "", lc = "";
+    if (r.bad) { bad++; }
+    if (line.hang) { hung++; label = "↓"; lc = "hang"; }
+    else if (r.adj > 0.005) { label = "+" + num(r.adj); lc = "plus"; loosest = Math.max(loosest, r.adj); }
+    else if (r.adj < -0.005) { label = "−" + num(-r.adj); lc = "minus"; squeezed++; }
+    else if (!panel.justify && !line.last) {
+      const gapEnd = L - r.N;
+      raggedSum += gapEnd; raggedN++;
+      if (gapEnd > 0.005) label = "□" + num(gapEnd);
+    }
+    if (r.bad) lc = "bad";
+    if (line.pushedIn) pushed++;
+    if (r.split) splits++;
+    if (label) html += `<div class="adj ${lc}" style="right:${x - (pitch - 1) / 2}em;width:${pitch}em;top:${top + L + 0.75}em"><span>${label}</span></div>`;
+  });
+  html += `</div>`;
+  const stage = root.querySelector(".stage");
+  stage.innerHTML = html;
+  stage.scrollLeft = stage.scrollWidth; // start at the first (rightmost) column
+
+  const chips = [`<li>Columns <b>${lines.length}</b></li>`,
+    `<li class="${bad ? "bad" : "good"}">Rule breaks <b>${bad}</b></li>`,
+    `<li class="${splits ? "split" : "good"}">Bad word splits <b>${splits}</b></li>`];
+  if (panel.mode === "fork") chips.push(`<li>Hung <b>${hung}</b></li>`, `<li>Pushed out <b>${pushed}</b></li>`);
+  if (panel.mode === "jis" || panel.mode === "keep") chips.push(`<li>Squeezed in <b>${squeezed}</b></li>`, `<li>Pushed out <b>${pushed}</b></li>`);
+  if (panel.justify) chips.push(`<li>Loosest column <b>+${num(loosest)} em</b></li>`);
+  else chips.push(`<li>Average space at column end <b>${num(raggedN ? raggedSum / raggedN : 0)} em</b></li>`);
+  root.querySelector(".chips").innerHTML = chips.join("");
+}
+
+// ---- BudouX ----
+let parser = null, budouxState = "loading";
+import("https://cdn.jsdelivr.net/npm/budoux@0.7.0/+esm")
+  .then(m => { parser = m.loadDefaultJapaneseParser(); budouxState = "live"; render(); })
+  .catch(() => { budouxState = "failed"; render(); });
+
+// ---- Yomitan (demo port, see yomitan-mini.js) ----
+let ym = null, ymState = "loading";
+setTimeout(() => {
+  try { ym = makeYomitan(YM_TRANSFORMS, YM_WORDS); ymState = "ready"; }
+  catch (e) { ymState = "failed"; console.error(e); }
+  render();
+}, 30);
+
+let segCache = { key: null };
+function yomitanSegs(paras) {
+  if (!ym) return { words: null, units: null, raw: null };
+  const key = paras.join("\n") + "|" + state.idioms;
+  if (segCache.key !== key) {
+    const raw = paras.map(p => ymSegment(ym, p, { ignoreIdioms: !state.idioms }));
+    const str = (p, list) => { const ch = Array.from(p); return list.map(x => ch.slice(x.s, x.e).join("")); };
+    segCache = {
+      key, raw,
+      words: raw.map((w, i) => str(paras[i], w)),
+      units: raw.map((w, i) => str(paras[i], ymUnits(w))),
+    };
+  }
+  return segCache;
+}
+
+function drawYomitan(paras, ys) {
+  const el = document.getElementById("ymWords");
+  const status = document.getElementById("ymStatus");
+  if (!ys.raw) {
+    el.innerHTML = "";
+    status.textContent = ymState === "failed" ? "The word list could not be loaded." : "Loading JMdict…";
+    return;
+  }
+  el.innerHTML = ys.raw.map((words, i) => {
+    const ch = Array.from(paras[i]);
+    return ymUnits(words).map(u => `<span class="ph">${u.words.map(w =>
+      `<span class="wd">${esc(ch.slice(w.s, w.e).join(""))}</span>`).join("")}</span>`).join("");
+  }).join('<span class="pb"></span>');
+  status.textContent = `Segmented live: ${ym.size.toLocaleString("en")} JMdict entries, Yomitan's deinflection rules, best-path scoring.`;
+}
+
+function phrasesFor(paras) {
+  if (parser) return paras.map(p => parser.parse(p));
+  if (state.sample !== "custom" && PRE[state.sample]) return PRE[state.sample];
+  return null;
+}
+
+function drawPhrases(paras, phrases) {
+  const el = document.getElementById("phrases");
+  const status = document.getElementById("budouxStatus");
+  if (!phrases) {
+    el.innerHTML = "";
+    status.textContent = budouxState === "loading"
+      ? "Loading BudouX…"
+      : "BudouX could not load here, so panel 4 falls back to character breaks for your own text.";
+    return;
+  }
+  el.innerHTML = phrases.map(par => par.map(p => `<span class="ph">${esc(p)}</span>`).join("")).join('<span class="pb"></span>');
+  status.textContent = budouxState === "live"
+    ? "Split live with the BudouX 0.7.0 Japanese model."
+    : "Split in advance with the BudouX 0.7.0 Japanese model.";
+}
+
+// ---- state & controls ----
+const state = { sample: "bocchan", L: 14, custom: "", minKeep: 2, idioms: false };
+try {
+  const saved = JSON.parse(localStorage.getItem("tategumi-demo") || "null");
+  if (saved && typeof saved.L === "number") state.L = saved.L;
+  if (saved && saved.show) for (const p of PANELS) if (p.id in saved.show) p.show = !!saved.show[p.id];
+} catch (e) {}
+function saveState() {
+  try {
+    localStorage.setItem("tategumi-demo", JSON.stringify({ L: state.L, show: Object.fromEntries(PANELS.map(p => [p.id, p.show])) }));
+  } catch (e) {}
+}
+buildPanels();
+
+const lenInput = document.getElementById("len");
+const lenOut = document.getElementById("lenOut");
+const textArea = document.getElementById("text");
+const customBox = document.getElementById("customBox");
+textArea.value = SAMPLES.melos;
+state.custom = textArea.value;
+
+function currentText() {
+  return state.sample === "custom" ? state.custom : SAMPLES[state.sample];
+}
+
+function render() {
+  lenInput.value = state.L;
+  lenOut.textContent = state.L + " em";
+  const paras = paragraphs(currentText());
+  const phrases = phrasesFor(paras);
+  const ys = yomitanSegs(paras);
+  const segs = { budoux: phrases, words: ys.words, units: ys.units };
+  for (const p of PANELS) drawPanel(p, paras, state.L, segs);
+  drawPhrases(paras, phrases);
+  drawYomitan(paras, ys);
+  fitFont();
+}
+
+// Size the text so that the bar and all four panels fit in the window
+// (glyph positions are in em, so only the font size changes).
+function fitFont() {
+  const cols = getComputedStyle(document.querySelector(".panels")).gridTemplateColumns.split(" ").length;
+  const wide = cols > 1;
+  const rows = Math.max(1, Math.ceil(PANELS.filter(p => p.show).length / cols));
+  const topH = document.querySelector(".top").getBoundingClientRect().height;
+  const headH = Math.max(0, ...Array.from(document.querySelectorAll(".panel:not([hidden]) header"), h => h.getBoundingClientRect().height));
+  const avail = window.innerHeight - topH - rows * (headH + 24) - (rows - 1) * 10 - 12;
+  const colsH = 0.6 + state.L + 1.9;
+  const fs = Math.max(wide ? 9 : 13, Math.min(24, Math.floor(avail / rows / colsH)));
+  document.querySelector(".panels").style.setProperty("--fs", fs + "px");
+  for (const s of document.querySelectorAll(".stage")) s.scrollLeft = s.scrollWidth;
+}
+window.addEventListener("resize", fitFont);
+
+document.getElementById("samples").addEventListener("click", ev => {
+  const b = ev.target.closest("button");
+  if (!b) return;
+  state.sample = b.dataset.k;
+  for (const x of document.querySelectorAll("#samples button")) x.setAttribute("aria-pressed", String(x === b));
+  customBox.hidden = state.sample !== "custom";
+  render();
+});
+lenInput.addEventListener("input", () => {
+  state.L = Number(lenInput.value);
+  saveState();
+  render();
+});
+document.getElementById("idioms").addEventListener("change", ev => {
+  state.idioms = ev.target.checked;
+  render();
+});
+document.getElementById("show").addEventListener("click", ev => {
+  const b = ev.target.closest("button");
+  if (!b) return;
+  const p = PANELS.find(x => x.id === b.dataset.id);
+  p.show = !p.show;
+  b.setAttribute("aria-pressed", String(p.show));
+  document.getElementById(p.id).hidden = !p.show;
+  saveState();
+  render();
+});
+document.getElementById("minKeep").addEventListener("change", ev => {
+  state.minKeep = Number(ev.target.value);
+  render();
+});
+let t = null;
+textArea.addEventListener("input", () => {
+  clearTimeout(t);
+  t = setTimeout(() => { state.custom = textArea.value; render(); }, 150);
+});
+
+render();
+</script>
