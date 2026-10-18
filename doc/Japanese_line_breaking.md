@@ -378,12 +378,78 @@ Change them separately if releases should come from the tera8m4 repository.
 
 Each phase lands through the push chain on its own.
 
+## Implementation status
+
+Phases 1–3 are implemented on the `ja-keep-words` branches. They have not been
+built or run as a whole yet; CI is the first full build. What was checked
+locally:
+
+- `jpwords.cpp` compiled on its own with `clang++`:
+  - `JpDeinflector` passes all 1446 cases of `transform_cases.lua`. On every
+    test source, its results (text, conditions, trace) are identical to the
+    Lua port's.
+  - Segmentation, units and split costs match the demo at every position of
+    every paragraph of `samples.json`.
+- `wordlist.lua`'s query and merge give the same `words.tsv` as the demo's
+  `make_words.py` on JMdict (450 891 keys). For this check, LuaJIT ran with
+  mocked SQLite cursors.
+- `lvtextfm.cpp` and `cre.cpp` pass `clang++ -fsyntax-only` with stub
+  headers.
+
+Differences from the plan:
+
+- **Segmentation:** characters other than Japanese letters (Latin, digits,
+  symbols, and U+FFFC for inline objects) are units of their own.
+  - When two paths cost the same, the later split wins (反駁|した). This
+    matches the demo's results on the samples, where floating point decides
+    such ties.
+  - Only an unknown *single* kana counts as a particle, as
+    [Units](#units) says. The demo also treats unknown 2-letter katakana as
+    particles.
+- **Window edges:** breaks at the window edges cost 0, and earlier breaks
+  are considered only inside the window. Breaks more than 16 characters back
+  would cost more than 16 em of gain anyway.
+- **Squeeze-in:** in phase 1 and in the scoring, squeeze-in only applies to
+  columns that `applyVerticalJustification` really shrinks:
+  - justified columns
+  - not indented (`y <= 0`)
+  - not the paragraph's last column, unless `text-align-last` is `justify`
+
+  Elsewhere the overflow would be drawn past the column bottom (see
+  `#reported_sentence_wrap` in `vertical_column_bottom_spec.lua`).
+- **Extra bindings:**
+  - `cre.jpSetKeepIdioms(bool)` for "Idioms as one word"
+  - `cre.jpSegment(text)` for `jpwords_spec.lua`
+  - `cre.jpConditionFlags(list, true)`, which takes any condition types
+- **One rule set:** the engine holds a single deinflection rule set.
+  `LanguageTransformer:addDescriptor()` replaces it.
+- **Default:** keep-words is off; it is under *Yomitan dictionaries → Keep
+  words together*. The word list (`words.tsv`, with `words.sig` holding the
+  dictionary signature) is built on first use.
+- **Re-rendering:** a change of these settings calls `requestRender()`
+  before `UpdatePos`. Settings that are not document properties do not
+  request a render by themselves.
+
+Still to do:
+
+- Measure render time against the budget in [Performance](#performance).
+- Run the specs in CI and tune the assertions of
+  `vertical_keep_words_spec.lua` if needed. It assumes about 50 characters
+  per column at most.
+
 ## Licensing
 
 - The deinflection port carries Yomitan's GPL-3.0-or-later notice, like the
   Lua port.
 - Check crengine's license header before adding GPLv3 files to it. The
   combined work must remain distributable under KOReader's AGPLv3.
+  - Checked: crengine's `README.TXT` says "GNU GPL license, version 2". Its
+    file headers name the GPL without a version.
+  - `jpwords.h` and `jpwords.cpp` carry the GPL-3.0-or-later notice.
+  - Combining them is fine only if crengine is GPL-2.0-or-later, as
+    KOReader's AGPLv3 distribution already assumes. This is still open: if
+    the "or later" reading does not hold, the deinflector has to move out of
+    crengine.
 
 ## Open questions
 

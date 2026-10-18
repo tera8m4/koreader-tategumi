@@ -17,6 +17,7 @@ On builds without these hooks, yomitan/compat.lua installs equivalents.
 
 local DataStorage = require("datastorage")
 local Device = require("device")
+local Event = require("ui/event")
 local Screen = Device.screen
 local LanguageSupport = require("languagesupport")
 local UIManager = require("ui/uimanager")
@@ -34,6 +35,7 @@ local Japanese = require("yomitan/japanese")
 local Scanner = require("yomitan/scanner")
 local Text = require("yomitan/text")
 local Translator = require("yomitan/translator")
+local WordList = require("yomitan/wordlist")
 
 local fullDefinition -- defined below
 
@@ -44,6 +46,8 @@ local SETTINGS_KEY = "yomitan"
 -- and file manager); connections are read-only.
 local opened_dictionaries = {} -- folder name -> Dictionary
 local open_errors = {} -- folder name -> error message
+-- Signature of the word list loaded into crengine (see updateKeepWords).
+local loaded_words_signature
 
 local Yomitan = WidgetContainer:extend{
     name = "yomitan",
@@ -65,6 +69,7 @@ function Yomitan:readSettings()
     if settings.short_view == nil then settings.short_view = true end
     if settings.mini_popup == nil then settings.mini_popup = true end
     if settings.fast_refresh == nil then settings.fast_refresh = true end
+    settings.keep_words = settings.keep_words or 0 -- letters, 0 is off
     Compat.no_flash = settings.no_flash
     self.settings = settings
 end
@@ -127,6 +132,40 @@ end
 
 function Yomitan:isActive()
     return self.dictionaries ~= nil and #self.dictionaries > 0
+end
+
+--- Keep Japanese words together at column breaks: crengine segments the text
+-- with the enabled dictionaries (see yomitan/wordlist.lua). Runs before the
+-- document is rendered; with `rerender`, re-renders it after a change.
+function Yomitan:updateKeepWords(rerender)
+    local document = self.ui and self.ui.document
+    if not (document and document.provider == "crengine") then return end
+    local cre = require("document/credocument"):engineInit()
+    local min_keep = self:isActive() and self.settings.keep_words or 0
+    if min_keep > 0 then
+        local path, signature = WordList.update(self.dictionaries, self:getDataDir())
+        if not path then
+            min_keep = 0
+        elseif signature ~= loaded_words_signature then
+            loaded_words_signature = nil
+            if cre.jpSetWords(path) then
+                loaded_words_signature = signature
+            else
+                logger.warn("yomitan: cannot load the word list", path)
+                min_keep = 0
+            end
+        end
+    elseif loaded_words_signature then
+        cre.jpSetWords("")
+        loaded_words_signature = nil
+    end
+    cre.jpSetKeepIdioms(self.settings.keep_idioms == true)
+    cre.jpSetMinKeep(min_keep)
+    if rerender then
+        -- These are not document properties, which request it themselves.
+        document._document:requestRender()
+        self.ui:handleEvent(Event:new("UpdatePos"))
+    end
 end
 
 --- Take over Japanese selection and lookups while dictionaries are enabled.
@@ -223,6 +262,7 @@ function Yomitan:init()
     self:readSettings()
     self:discoverDictionaries()
     self:updateEnabledDictionaries()
+    self:updateKeepWords()
     if self.ui and self.ui.menu then
         self.ui.menu:registerToMainMenu(self)
     end
@@ -522,6 +562,9 @@ function Yomitan:showDictionariesMenu(touchmenu_instance)
             self:saveSettings()
             self:discoverDictionaries()
             self:updateEnabledDictionaries()
+            if self.settings.keep_words > 0 then
+                self:updateKeepWords(true)
+            end
             if touchmenu_instance then touchmenu_instance:updateItems() end
         end,
     })
@@ -561,6 +604,31 @@ function Yomitan:addToMainMenu(menu_items)
             end,
         })
     end
+    local keep_words_items = {}
+    for __, n in ipairs({ 0, 2, 3 }) do
+        table.insert(keep_words_items, {
+            text = n == 0 and _("Off") or T(_("%1 letters"), n),
+            radio = true,
+            checked_func = function() return self.settings.keep_words == n end,
+            callback = function()
+                self.settings.keep_words = n
+                self:saveSettings()
+                self:updateKeepWords(true)
+            end,
+        })
+    end
+    keep_words_items[#keep_words_items].separator = true
+    table.insert(keep_words_items, {
+        text = _("Idioms as one word"),
+        help_text = _("Also keep idioms (such as 腰を抜かす) together. By default they are split into their words."),
+        enabled_func = function() return self.settings.keep_words > 0 end,
+        checked_func = function() return self.settings.keep_idioms == true end,
+        callback = function()
+            self.settings.keep_idioms = not self.settings.keep_idioms
+            self:saveSettings()
+            self:updateKeepWords(true)
+        end,
+    })
     menu_items.yomitan = {
         text = _("Yomitan dictionaries"),
         sorting_hint = "search_settings",
@@ -600,6 +668,14 @@ function Yomitan:addToMainMenu(menu_items)
             {
                 text = _("Result grouping"),
                 sub_item_table = mode_items,
+            },
+            {
+                text_func = function()
+                    local n = self.settings.keep_words
+                    return n > 0 and T(_("Keep words together: %1 letters"), n) or _("Keep words together: off")
+                end,
+                help_text = _("In vertical Japanese text, avoid splitting words across columns (such as 飛び降|りる), using the enabled dictionaries. A word part left at a column end or start keeps at least this many letters. The first use builds a word list from the dictionaries, which can take a while."),
+                sub_item_table = keep_words_items,
             },
             {
                 text = _("Compact popup"),
