@@ -34,6 +34,13 @@ describe("Yomitan plugin", function()
         -- Like PluginLoader:loadPlugins(), for modules required after loading.
         package.path = "plugins/yomitan.koplugin/?.lua;" .. package.path
         disable_plugins()
+        -- The regular dictionary window with full entries, and only the test
+        -- dictionary (the JMdict excerpt next to it is for the jpwords specs).
+        G_reader_settings:saveSetting("yomitan", {
+            mini_popup = false,
+            short_view = false,
+            dicts_disabled = { jpwords_dictionary = true },
+        })
         load_plugin("yomitan.koplugin")
         local PluginLoader = require("pluginloader")
         for _, plugin in ipairs(PluginLoader.enabled_plugins) do
@@ -62,6 +69,7 @@ describe("Yomitan plugin", function()
         readerui:closeDocument()
         readerui:onClose()
         os.remove(epub_path)
+        G_reader_settings:delSetting("yomitan")
     end)
 
     it("takes over Japanese lookups", function()
