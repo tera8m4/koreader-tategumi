@@ -9,6 +9,10 @@ on:
       tag:
         description: 'Release tag (e.g. v2025.05)'
         required: true
+      artifacts_run_id:
+        description: 'Publish the packages of this earlier run (its ID) instead of building them'
+        required: false
+        default: ''
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -27,6 +31,7 @@ jobs:
 
   ffi-cdefs:
     name: LuaJIT FFI declarations
+    if: ${{ !inputs.artifacts_run_id }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -46,6 +51,7 @@ jobs:
 
   kindle:
     name: Kindle
+    if: ${{ !inputs.artifacts_run_id }}
     runs-on: ubuntu-latest
     container:
       image: koreader/kokindle:latest
@@ -74,6 +80,7 @@ jobs:
 
   kindlehf:
     name: Kindle (HF)
+    if: ${{ !inputs.artifacts_run_id }}
     runs-on: ubuntu-latest
     container:
       image: koreader/kokindle:latest
@@ -102,6 +109,7 @@ jobs:
 
   kindlepw2:
     name: Kindle (PW2/non-HF)
+    if: ${{ !inputs.artifacts_run_id }}
     runs-on: ubuntu-latest
     container:
       image: koreader/kokindle:latest
@@ -130,6 +138,7 @@ jobs:
 
   kobo:
     name: Kobo
+    if: ${{ !inputs.artifacts_run_id }}
     runs-on: ubuntu-latest
     container:
       image: koreader/kokobo:latest
@@ -158,6 +167,7 @@ jobs:
 
   pocketbook:
     name: PocketBook
+    if: ${{ !inputs.artifacts_run_id }}
     runs-on: ubuntu-latest
     container:
       image: koreader/kopb:latest
@@ -186,6 +196,7 @@ jobs:
 
   pocketbookhf:
     name: PocketBook (HF)
+    if: ${{ !inputs.artifacts_run_id }}
     runs-on: ubuntu-latest
     container:
       image: koreader/kopb:2.1.0-22.04
@@ -214,6 +225,7 @@ jobs:
 
   cervantes:
     name: Cervantes
+    if: ${{ !inputs.artifacts_run_id }}
     runs-on: ubuntu-latest
     container:
       image: koreader/kocervantes:latest
@@ -242,6 +254,7 @@ jobs:
 
   remarkable:
     name: reMarkable (armhf)
+    if: ${{ !inputs.artifacts_run_id }}
     runs-on: ubuntu-latest
     container:
       image: koreader/koremarkable:latest
@@ -270,6 +283,7 @@ jobs:
 
   remarkable-aarch64:
     name: reMarkable (aarch64)
+    if: ${{ !inputs.artifacts_run_id }}
     runs-on: ubuntu-latest
     container:
       image: koreader/koremarkable:latest
@@ -296,8 +310,25 @@ jobs:
           if-no-files-found: error
           path: koreader-remarkable-aarch64-latest-stable.zip
 
+  # Forks without the APK signing secrets release without Android.
+  android-signing:
+    name: Android signing key
+    if: ${{ !inputs.artifacts_run_id }}
+    runs-on: ubuntu-latest
+    outputs:
+      available: ${{ steps.check.outputs.available }}
+    steps:
+      - id: check
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE" ]; then available=true; else available=false; fi
+          echo "available=$available" >> "$GITHUB_OUTPUT"
+
   android-arm:
     name: Android (ARM)
+    needs: android-signing
+    if: needs.android-signing.outputs.available == 'true'
     runs-on: ubuntu-latest
     container:
       image: koreader/koandroid:latest
@@ -337,6 +368,8 @@ jobs:
 
   android-arm64:
     name: Android (ARM64)
+    needs: android-signing
+    if: needs.android-signing.outputs.available == 'true'
     runs-on: ubuntu-latest
     container:
       image: koreader/koandroid:latest
@@ -375,6 +408,7 @@ jobs:
 
   jitendex:
     name: Jitendex dictionary
+    if: ${{ !inputs.artifacts_run_id }}
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.download.outputs.version }}
@@ -409,9 +443,13 @@ jobs:
 
   release:
     name: Create Release
-    needs: [ffi-cdefs, kindle, kindlehf, kindlepw2, kobo, pocketbook, pocketbookhf, cervantes, remarkable, remarkable-aarch64, android-arm, android-arm64, jitendex]
+    needs: [ffi-cdefs, kindle, kindlehf, kindlepw2, kobo, pocketbook, pocketbookhf, cervantes, remarkable, remarkable-aarch64, android-signing, android-arm, android-arm64, jitendex]
+    # Also when builds were skipped: no Android signing key, or an earlier
+    # run's packages.
+    if: ${{ !cancelled() && !contains(needs.*.result, 'failure') }}
     runs-on: ubuntu-latest
     permissions:
+      actions: read
       contents: write
     steps:
       - uses: actions/checkout@v4
@@ -433,6 +471,8 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: artifacts/
+          run-id: ${{ inputs.artifacts_run_id || github.run_id }}
+          github-token: ${{ github.token }}
 
       - name: Convert ZIPs to OTA archives
         run: |
@@ -464,10 +504,14 @@ jobs:
           # Android "link" type OTA index files (no extension, first line = APK filename)
           # otamanager downloads koreader-android[-arm64]-latest-stable (no ext),
           # reads line 1 as the APK filename, then downloads that APK directly.
-          echo "koreader-android-arm64-$TAG.apk" \
-            > artifacts/android-arm64/koreader-android-arm64-latest-stable
-          echo "koreader-android-$TAG.apk" \
-            > artifacts/android-arm/koreader-android-latest-stable
+          if [ -d artifacts/android-arm64 ]; then
+            echo "koreader-android-arm64-$TAG.apk" \
+              > artifacts/android-arm64/koreader-android-arm64-latest-stable
+          fi
+          if [ -d artifacts/android-arm ]; then
+            echo "koreader-android-$TAG.apk" \
+              > artifacts/android-arm/koreader-android-latest-stable
+          fi
 
       - name: Generate zsync files
         run: |
@@ -532,6 +576,27 @@ jobs:
             echo "$DELIM"
           } >> $GITHUB_ENV
 
+      - name: Android rows and Jitendex version
+        run: |
+          base="${{ github.server_url }}/${{ github.repository }}/releases/download/$RELEASE_TAG"
+          DELIM=$(openssl rand -hex 8)
+          {
+            echo "ANDROID_ROWS<<$DELIM"
+            if [ -d artifacts/android-arm ]; then
+              echo "| Android (ARM) | [koreader-android-$RELEASE_TAG.apk]($base/koreader-android-$RELEASE_TAG.apk) |"
+            fi
+            if [ -d artifacts/android-arm64 ]; then
+              echo "| Android (ARM64) | [koreader-android-arm64-$RELEASE_TAG.apk]($base/koreader-android-arm64-$RELEASE_TAG.apk) |"
+            fi
+            echo "$DELIM"
+          } >> "$GITHUB_ENV"
+          version="${{ needs.jitendex.outputs.version }}"
+          if [ -z "$version" ]; then
+            # An earlier run's package: its folder is named after the dictionary title.
+            version=$(unzip -Z1 artifacts/jitendex/yomitan-jitendex.zip | head -1 | cut -d/ -f1)
+          fi
+          echo "JITENDEX_VERSION=$version" >> "$GITHUB_ENV"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -553,12 +618,11 @@ jobs:
             | Cervantes | [koreader-cervantes-${{ env.RELEASE_TAG }}.zip](${{ github.server_url }}/${{ github.repository }}/releases/download/${{ env.RELEASE_TAG }}/koreader-cervantes-${{ env.RELEASE_TAG }}.zip) |
             | reMarkable (armhf) | [koreader-remarkable-${{ env.RELEASE_TAG }}.zip](${{ github.server_url }}/${{ github.repository }}/releases/download/${{ env.RELEASE_TAG }}/koreader-remarkable-${{ env.RELEASE_TAG }}.zip) |
             | reMarkable (aarch64) | [koreader-remarkable-aarch64-${{ env.RELEASE_TAG }}.zip](${{ github.server_url }}/${{ github.repository }}/releases/download/${{ env.RELEASE_TAG }}/koreader-remarkable-aarch64-${{ env.RELEASE_TAG }}.zip) |
-            | Android (ARM) | [koreader-android-${{ env.RELEASE_TAG }}.apk](${{ github.server_url }}/${{ github.repository }}/releases/download/${{ env.RELEASE_TAG }}/koreader-android-${{ env.RELEASE_TAG }}.apk) |
-            | Android (ARM64) | [koreader-android-arm64-${{ env.RELEASE_TAG }}.apk](${{ github.server_url }}/${{ github.repository }}/releases/download/${{ env.RELEASE_TAG }}/koreader-android-arm64-${{ env.RELEASE_TAG }}.apk) |
+            ${{ env.ANDROID_ROWS }}
 
             ## Japanese dictionary
 
-            [yomitan-jitendex.zip](${{ github.server_url }}/${{ github.repository }}/releases/download/${{ env.RELEASE_TAG }}/yomitan-jitendex.zip): [Jitendex](https://jitendex.org) ${{ needs.jitendex.outputs.version }}, converted for `yomitan.koplugin`. Unzip it into `koreader/data/yomitan/`, then enable it in **Search settings → Yomitan dictionaries**. Jitendex is licensed under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) and includes material from the JMdict dictionary files of the [Electronic Dictionary Research and Development Group](https://www.edrdg.org/).
+            [yomitan-jitendex.zip](${{ github.server_url }}/${{ github.repository }}/releases/download/${{ env.RELEASE_TAG }}/yomitan-jitendex.zip): [Jitendex](https://jitendex.org) (${{ env.JITENDEX_VERSION }}), converted for `yomitan.koplugin`. Unzip it into `koreader/data/yomitan/`, then enable it in **Search settings → Yomitan dictionaries**. Jitendex is licensed under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) and includes material from the JMdict dictionary files of the [Electronic Dictionary Research and Development Group](https://www.edrdg.org/).
           files: artifacts/**/*
           draft: false
           prerelease: false
