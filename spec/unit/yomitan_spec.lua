@@ -196,9 +196,9 @@ describe("Yomitan", function()
 
         it("sizes images like Yomitan", function()
             -- 350 "px" preferred width at Yomitan's 14px image font size, capped.
-            local html = Html.image({ path = "a b.png", width = 7, height = 7, preferredWidth = 140, preferredHeight = 70 })
+            local html = Html.image({ path = "a b.png", width = 7, height = 7, preferredWidth = 140, preferredHeight = 70 }) -- unscaled_size_check: ignore
             assert.are.equal('<span class="gloss-image-link"><img src="media/a b.png" class="gloss-image" style="width:10.000em;height:5.000em"/></span>', html)
-            html = Html.image({ path = "c.png", width = 10, height = 20, preferredWidth = 2, sizeUnits = "em" })
+            html = Html.image({ path = "c.png", width = 10, height = 20, preferredWidth = 2, sizeUnits = "em" }) -- unscaled_size_check: ignore
             assert.is_truthy(html:find("width:2.000em;height:4.000em", 1, true))
         end)
     end)
