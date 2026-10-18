@@ -101,8 +101,7 @@ The input is one paragraph. The output is a list of words, each with flags.
    - **An unknown katakana run** of 2+ characters: cost 2 (names and
      loanwords such as メロス).
    - **An unknown single character:** cost 3.5.
-3. Entries tagged only `exp` (idioms such as 腰を抜かす) are skipped by default,
-   so they split into their words.
+3. Entries tagged only `exp` (idioms such as 腰を抜かす) count as one word.
 
 ### Word flags
 
@@ -136,14 +135,14 @@ Split cost of a break at position `k`:
 
 | Break | Cost | Example |
 |---|---|---|
-| Between units | 0 | 腰を\|抜かした |
+| Between units | 0 | 二階から\|飛び降りて |
 | Inside a unit, right before a kanji | 1.5 | 飛び\|降りる |
 | Inside a unit, at a word boundary | 3 | 無闇を\|したと |
 | Inside a word before kana (okurigana, inflection) | 8 | 飛び降\|りる |
 | Fewer than `MIN` letters on either side | 20 | 沈めてい\|く, 救うの\|だ。」と |
 
 The letters on each side of the break are counted within the unit, stopping
-at punctuation. `MIN` defaults to 2.
+at punctuation. `MIN` is 3 (`JpWords::MIN_KEEP`).
 
 The candidates are:
 
@@ -216,7 +215,6 @@ koreader:
   - `getHash()` identifies the databases (paths, sizes, mtimes), for the
     render hash.
 - **`JpWords`** (static facade):
-  - `setMinKeep(int)`: 0 means off.
   - `segment(text, from, to)`: best-path segmentation and units for a window.
   - `splitCost(k)`: the cost table above.
   - Cache: per paragraph, keyed by window.
@@ -260,7 +258,6 @@ The functions sit in one block next to `setUserHyphenationDict`, plus their
 - `cre.jpSetDictionaries(paths)`: the `dict.sqlite3` files of the enabled
   dictionaries, opened read-only by `jpdictionary.cpp` (fork-only file in
   koreader-base; `koreader-cre` links SQLite)
-- `cre.jpSetMinKeep(n)`
 
 ### koreader: Lua
 
@@ -270,8 +267,9 @@ The functions sit in one block next to `setUserHyphenationDict`, plus their
   - `getUserFacingInflectionRules` and `conditionsMatch` stay in Lua.
 - **`Yomitan:updateKeepWords()`** passes the enabled dictionaries' database
   paths to `cre.jpSetDictionaries` from `Yomitan:init`, before the render.
-- **Settings:** "Keep words together: off / 2 / 3 letters" and "Idioms as one
-  word". On change, re-render the way `ReaderUserHyph` does.
+- **No settings:** words are kept together whenever Yomitan dictionaries are
+  enabled; `MIN` and idioms are fixed in crengine, so the plugin only passes
+  the dictionaries. When they change, re-render the way `ReaderUserHyph` does.
 
 ### Performance
 
@@ -310,8 +308,8 @@ The functions sit in one block next to `setUserHyphenationDict`, plus their
   - 救うの|だ。 costing 20
 - **New `spec/unit/vertical_keep_words_spec.lua`:** an EPUB fixture where
   飛び降りる straddles a column break.
-  - With `MIN = 0`, today's split.
-  - With `MIN = 2`, no break with cost ≥ 8, and the squeeze-in case.
+  - Without dictionaries, today's split.
+  - With them, no break with cost ≥ 8, and the squeeze-in case.
 - **Regressions:** `./kodev test front -f "Vertical text"`, the Yomitan and
   bookwords specs, and `./kodev test base`.
 - **Commands:** use the Nix shell, e.g. `nix develop --command ./kodev test
@@ -428,18 +426,17 @@ Differences from the plan:
   Elsewhere the overflow would be drawn past the column bottom (see
   `#reported_sentence_wrap` in `vertical_column_bottom_spec.lua`).
 - **Extra bindings:**
-  - `cre.jpSetKeepIdioms(bool)` for "Idioms as one word"
   - `cre.jpSegment(text)` for `jpwords_spec.lua`
   - `cre.jpConditionFlags(list, true)`, which takes any condition types
 - **One rule set:** the engine holds a single deinflection rule set.
   `LanguageTransformer:addDescriptor()` replaces it.
-- **Default:** keep-words is off; it is under *Yomitan dictionaries → Keep
-  words together*.
+- **No settings:** keep-words is on whenever Yomitan dictionaries are
+  enabled, with `MIN` = 3 and idioms as one word.
 - **No word list file:** words are looked up in the dictionary databases
   directly (see `JpDictionary`), instead of a `words.tsv` built from them.
-- **Re-rendering:** a change of these settings calls `requestRender()`
-  before `UpdatePos`. Settings that are not document properties do not
-  request a render by themselves.
+- **Re-rendering:** a change of the enabled dictionaries calls
+  `requestRender()` before `UpdatePos`. They are not document properties, so
+  they do not request a render by themselves.
 
 Still to do:
 

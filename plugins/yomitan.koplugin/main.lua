@@ -66,7 +66,6 @@ function Yomitan:readSettings()
     if settings.short_view == nil then settings.short_view = true end
     if settings.mini_popup == nil then settings.mini_popup = true end
     if settings.fast_refresh == nil then settings.fast_refresh = true end
-    settings.keep_words = settings.keep_words or 0 -- letters, 0 is off
     Compat.no_flash = settings.no_flash
     self.settings = settings
 end
@@ -133,26 +132,20 @@ end
 
 --- Keep Japanese words together at column breaks: crengine segments the text
 -- into words found in the enabled dictionaries, querying their databases
--- directly. Runs before the document is rendered; with `rerender`, re-renders
--- it after a change.
+-- directly (none disables it). Runs before the document is rendered; with
+-- `rerender`, re-renders it after a change.
 function Yomitan:updateKeepWords(rerender)
     local document = self.ui and self.ui.document
     if not (document and document.provider == "crengine") then return end
     local cre = require("document/credocument"):engineInit()
-    local min_keep = self:isActive() and self.settings.keep_words or 0
     local paths = {}
-    if min_keep > 0 then
-        for _, dict in ipairs(self.dictionaries) do
-            table.insert(paths, dict.dir .. "/dict.sqlite3")
-        end
+    for _, dict in ipairs(self.dictionaries or {}) do
+        table.insert(paths, dict.dir .. "/dict.sqlite3")
     end
     local ok, err = cre.jpSetDictionaries(paths)
     if not ok then
         logger.warn("yomitan: cannot use the dictionaries to keep words together:", err)
-        min_keep = 0
     end
-    cre.jpSetKeepIdioms(self.settings.keep_idioms == true)
-    cre.jpSetMinKeep(min_keep)
     if rerender then
         -- These are not document properties, which request it themselves.
         document._document:requestRender()
@@ -554,9 +547,7 @@ function Yomitan:showDictionariesMenu(touchmenu_instance)
             self:saveSettings()
             self:discoverDictionaries()
             self:updateEnabledDictionaries()
-            if self.settings.keep_words > 0 then
-                self:updateKeepWords(true)
-            end
+            self:updateKeepWords(true)
             if touchmenu_instance then touchmenu_instance:updateItems() end
         end,
     })
@@ -596,31 +587,6 @@ function Yomitan:addToMainMenu(menu_items)
             end,
         })
     end
-    local keep_words_items = {}
-    for __, n in ipairs({ 0, 2, 3 }) do
-        table.insert(keep_words_items, {
-            text = n == 0 and _("Off") or T(_("%1 letters"), n),
-            radio = true,
-            checked_func = function() return self.settings.keep_words == n end,
-            callback = function()
-                self.settings.keep_words = n
-                self:saveSettings()
-                self:updateKeepWords(true)
-            end,
-        })
-    end
-    keep_words_items[#keep_words_items].separator = true
-    table.insert(keep_words_items, {
-        text = _("Idioms as one word"),
-        help_text = _("Also keep idioms (such as 腰を抜かす) together. By default they are split into their words."),
-        enabled_func = function() return self.settings.keep_words > 0 end,
-        checked_func = function() return self.settings.keep_idioms == true end,
-        callback = function()
-            self.settings.keep_idioms = not self.settings.keep_idioms
-            self:saveSettings()
-            self:updateKeepWords(true)
-        end,
-    })
     menu_items.yomitan = {
         text = _("Yomitan dictionaries"),
         sorting_hint = "search_settings",
@@ -660,14 +626,6 @@ function Yomitan:addToMainMenu(menu_items)
             {
                 text = _("Result grouping"),
                 sub_item_table = mode_items,
-            },
-            {
-                text_func = function()
-                    local n = self.settings.keep_words
-                    return n > 0 and T(_("Keep words together: %1 letters"), n) or _("Keep words together: off")
-                end,
-                help_text = _("In vertical Japanese text, avoid splitting words across columns (such as 飛び降|りる), using the enabled dictionaries. A word part left at a column end or start keeps at least this many letters. Rendering a book takes longer with this on."),
-                sub_item_table = keep_words_items,
             },
             {
                 text = _("Compact popup"),

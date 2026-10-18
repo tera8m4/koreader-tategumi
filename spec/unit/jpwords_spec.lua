@@ -8,12 +8,9 @@ describe("JpWords", function()
         cre = require("libs/libkoreader-cre")
         cre.jpSetDeinflectRules(dofile("plugins/yomitan.koplugin/yomitan/data/transforms_ja.lua"))
         assert.is_true(cre.jpSetDictionaries({"spec/front/unit/yomitan/jpwords_dictionary/dict.sqlite3"}))
-        cre.jpSetKeepIdioms(false)
-        cre.jpSetMinKeep(2)
     end)
 
     teardown(function()
-        cre.jpSetMinKeep(0)
         cre.jpSetDictionaries({})
     end)
 
@@ -31,9 +28,10 @@ describe("JpWords", function()
         assert.are.same({"二階", "から", "飛び降りて"}, seg.words)
         assert.are.same({"二階から", "飛び降りて"}, seg.units)
         assert.are.equal(0, seg.costs[4]) -- 二階から|飛び降りて
-        assert.are.equal(1.5, seg.costs[6]) -- 飛び|降りて
-        assert.are.equal(8, seg.costs[7]) -- 飛び降|りて
+        -- Fewer than 3 letters on a side.
         assert.are.equal(20, seg.costs[5]) -- 飛|び降りて
+        assert.are.equal(20, seg.costs[6]) -- 飛び|降りて
+        assert.are.equal(20, seg.costs[7]) -- 飛び降|りて
     end)
 
     it("prefers a common entry written this way", function()
@@ -51,7 +49,6 @@ describe("JpWords", function()
         assert.are.same({"メロス", "は", "激怒", "した。"}, seg.words)
         assert.are.same({"メロスは", "激怒した。"}, seg.units)
         assert.are.equal(0, seg.costs[4]) -- メロスは|激怒した。
-        assert.are.equal(3, seg.costs[6]) -- 激怒|した。
     end)
 
     it("counts letters up to the punctuation", function()
@@ -59,25 +56,12 @@ describe("JpWords", function()
         local seg = cre.jpSegment("「救うのだ。」と")
         assert.are.same({"「救うのだ。」と"}, seg.units)
         assert.are.equal(20, seg.costs[4])
-        assert.are.equal(3, seg.costs[3]) -- 救う|のだ
     end)
 
-    it("splits idioms into their words unless asked not to", function()
+    it("keeps idioms as one word", function()
         local seg = cre.jpSegment("腰を抜かした事がある。")
-        assert.are.same({"腰を", "抜かした", "事が", "ある。"}, seg.units)
-        assert.are.equal(0, seg.costs[2]) -- 腰を|抜かした
-        cre.jpSetKeepIdioms(true)
-        finally(function() cre.jpSetKeepIdioms(false) end)
-        seg = cre.jpSegment("腰を抜かした事がある。")
         assert.are.same({"腰を抜かした", "事がある。"}, seg.units)
-        assert.are.equal(1.5, seg.costs[2]) -- 腰を|抜かした
-    end)
-
-    it("has no minimum on either side with MIN = 0", function()
-        cre.jpSetMinKeep(0)
-        finally(function() cre.jpSetMinKeep(2) end)
-        local seg = cre.jpSegment("沈めていくと")
-        assert.are.equal(8, seg.costs[4]) -- 沈めてい|くと: inside a word
-        assert.are.equal(3, seg.costs[5]) -- 沈めていく|と: at a word boundary
+        assert.are.equal(20, seg.costs[2]) -- 腰を|抜かした
+        assert.are.equal(0, seg.costs[6]) -- 腰を抜かした|事がある。
     end)
 end)

@@ -2,8 +2,8 @@
 Vertical text: keep Japanese words together at column breaks.
 
 Paragraphs put 飛び降りる at every offset from the column start, so that column
-breaks fall at every position inside it. Without keep-words (MIN = 0) some
-column splits it badly (飛び降|りる, cost 8 or more); with MIN = 2 none does.
+breaks fall at every position inside it. Without keep-words (no dictionary)
+some column splits it badly (飛び降|りる); with it none does.
 With shrinkable punctuation spacing in the column, the rest of the word is
 squeezed in instead of being split.
 
@@ -30,12 +30,9 @@ describe("Vertical text: keep words together #keep_words", function()
         UIManager        = require("ui/uimanager")
         cre = require("document/credocument"):engineInit()
         cre.jpSetDeinflectRules(dofile("plugins/yomitan.koplugin/yomitan/data/transforms_ja.lua"))
-        assert.is_true(cre.jpSetDictionaries({"spec/front/unit/yomitan/jpwords_dictionary/dict.sqlite3"}))
-        cre.jpSetKeepIdioms(false)
     end)
 
     teardown(function()
-        cre.jpSetMinKeep(0)
         cre.jpSetDictionaries({})
         os.remove(html_path)
     end)
@@ -65,8 +62,9 @@ p { margin: 0; text-indent: 0; text-align: justify; }
 
     -- For each occurrence of the word: the number of its chars before the
     -- first column break inside it (0 when it is not split).
-    local function split_positions(filler, min_keep)
-        cre.jpSetMinKeep(min_keep)
+    local function split_positions(filler, keep_words)
+        assert.is_true(cre.jpSetDictionaries(keep_words
+            and {"spec/front/unit/yomitan/jpwords_dictionary/dict.sqlite3"} or {}))
         write_fixture(filler)
         local reader = ReaderUI:new{
             dimen = Screen:getSize(),
@@ -108,7 +106,7 @@ p { margin: 0; text-indent: 0; text-align: justify; }
         return splits
     end
 
-    -- 飛|び, 飛び降|りる and 飛び降り|る: fewer than 2 letters on a side, or okurigana.
+    -- 飛|び, 飛び降|りる and 飛び降り|る: one or two letters on a side, or okurigana.
     local function bad_splits(splits)
         local n = 0
         for _, split in ipairs(splits) do
@@ -126,22 +124,22 @@ p { margin: 0; text-indent: 0; text-align: justify; }
     end
 
     it("splits words anywhere when off", function()
-        local splits = split_positions("犬", 0)
+        local splits = split_positions("犬", false)
         print("[keep_words] off:", table.concat(splits, ","))
         assert.is_true(bad_splits(splits) > 0)
     end)
 
-    it("leaves no bad split with MIN = 2", function()
-        local splits = split_positions("犬", 2)
-        print("[keep_words] min 2:", table.concat(splits, ","))
+    it("leaves no bad split when on", function()
+        local splits = split_positions("犬", true)
+        print("[keep_words] on:", table.concat(splits, ","))
         assert.are.equal(0, bad_splits(splits))
     end)
 
     it("squeezes the rest of the word in when spacing can shrink", function()
-        local off = split_positions("犬、", 0)
-        local on = split_positions("犬、", 2)
+        local off = split_positions("犬、", false)
+        local on = split_positions("犬、", true)
         print("[keep_words] squeeze off:", table.concat(off, ","))
-        print("[keep_words] squeeze min 2:", table.concat(on, ","))
+        print("[keep_words] squeeze on:", table.concat(on, ","))
         assert.are.equal(0, bad_splits(on))
         -- Breaks right after the word: squeezing in ends more columns there.
         assert.is_true(count(on, WORD_LENGTH) > count(off, WORD_LENGTH))
