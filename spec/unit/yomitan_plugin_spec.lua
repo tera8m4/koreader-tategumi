@@ -31,6 +31,8 @@ describe("Yomitan plugin", function()
 
     setup(function()
         require("commonrequire")
+        -- Like PluginLoader:loadPlugins(), for modules required after loading.
+        package.path = "plugins/yomitan.koplugin/?.lua;" .. package.path
         disable_plugins()
         load_plugin("yomitan.koplugin")
         local PluginLoader = require("pluginloader")

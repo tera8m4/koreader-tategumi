@@ -54,7 +54,7 @@ describe("JpWords", function()
     it("counts letters up to the punctuation", function()
         -- Only だ would stay after the break: 救うの|だ。」と
         local seg = cre.jpSegment("「救うのだ。」と")
-        assert.are.same({"「救うのだ。」と"}, seg.units)
+        assert.are.same({"「救う", "のだ。」と"}, seg.units) -- のだ is an expression
         assert.are.equal(20, seg.costs[4])
     end)
 
