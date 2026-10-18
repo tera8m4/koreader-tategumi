@@ -373,9 +373,43 @@ jobs:
           name: android-arm64
           path: koreader-android-arm64-latest-stable.apk
 
+  jitendex:
+    name: Jitendex dictionary
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.download.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Download the latest Jitendex for Yomitan
+        id: download
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(gh release view --repo stephenmk/stephenmk.github.io --json tagName -q .tagName)
+          gh release download "$version" --repo stephenmk/stephenmk.github.io \
+            --pattern jitendex-yomitan.zip --dir jitendex-src
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Convert for yomitan.koplugin
+        run: |
+          # Pillow converts images KOReader cannot display.
+          pip install Pillow
+          python3 tools/yomitan_convert.py -o jitendex-out jitendex-src/jitendex-yomitan.zip
+          # Unzipped into koreader/data/yomitan/ on the device.
+          (cd jitendex-out && zip -qr ../yomitan-jitendex.zip .)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jitendex
+          if-no-files-found: error
+          path: yomitan-jitendex.zip
+
   release:
     name: Create Release
-    needs: [ffi-cdefs, kindle, kindlehf, kindlepw2, kobo, pocketbook, pocketbookhf, cervantes, remarkable, remarkable-aarch64, android-arm, android-arm64]
+    needs: [ffi-cdefs, kindle, kindlehf, kindlepw2, kobo, pocketbook, pocketbookhf, cervantes, remarkable, remarkable-aarch64, android-arm, android-arm64, jitendex]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -521,6 +555,10 @@ jobs:
             | reMarkable (aarch64) | [koreader-remarkable-aarch64-${{ env.RELEASE_TAG }}.zip](https://github.com/m-tky/koreader-tategumi/releases/download/${{ env.RELEASE_TAG }}/koreader-remarkable-aarch64-${{ env.RELEASE_TAG }}.zip) |
             | Android (ARM) | [koreader-android-${{ env.RELEASE_TAG }}.apk](https://github.com/m-tky/koreader-tategumi/releases/download/${{ env.RELEASE_TAG }}/koreader-android-${{ env.RELEASE_TAG }}.apk) |
             | Android (ARM64) | [koreader-android-arm64-${{ env.RELEASE_TAG }}.apk](https://github.com/m-tky/koreader-tategumi/releases/download/${{ env.RELEASE_TAG }}/koreader-android-arm64-${{ env.RELEASE_TAG }}.apk) |
+
+            ## Japanese dictionary
+
+            [yomitan-jitendex.zip](${{ github.server_url }}/${{ github.repository }}/releases/download/${{ env.RELEASE_TAG }}/yomitan-jitendex.zip): [Jitendex](https://jitendex.org) ${{ needs.jitendex.outputs.version }}, converted for `yomitan.koplugin`. Unzip it into `koreader/data/yomitan/`, then enable it in **Search settings → Yomitan dictionaries**. Jitendex is licensed under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) and includes material from the JMdict dictionary files of the [Electronic Dictionary Research and Development Group](https://www.edrdg.org/).
           files: artifacts/**/*
           draft: false
           prerelease: false
