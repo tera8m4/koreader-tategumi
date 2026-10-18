@@ -39,7 +39,7 @@ IPA and kanji banks are skipped.
 
 | File | Origin |
 | --- | --- |
-| `yomitan/language_transformer.lua` | `ext/js/language/language-transformer.js` |
+| `yomitan/language_transformer.lua` | `ext/js/language/language-transformer.js`, ported to C++ in crengine (`jpwords.cpp`); the Lua module wraps it |
 | `yomitan/japanese.lua` | `ext/js/language/ja/japanese*.js`, `ext/js/language/CJK-util.js` |
 | `yomitan/translator.lua` | `ext/js/language/translator.js` (term lookup) |
 | `yomitan/html.lua` | `ext/js/display/structured-content-generator.js` |
@@ -50,6 +50,10 @@ IPA and kanji banks are skipped.
 The generated data and the specs (`spec/unit/yomitan_spec.lua`) come from the
 same Yomitan revision; to update, run the generator against a newer Yomitan
 checkout (see the header of `tools/yomitan/generate_lua_data.mjs`).
+
+Deinflection runs in crengine, which also uses it to keep Japanese words
+together at column breaks (see `doc/Japanese_line_breaking.md`), so the plugin
+needs a build of this fork.
 
 ## Differences from Yomitan
 
