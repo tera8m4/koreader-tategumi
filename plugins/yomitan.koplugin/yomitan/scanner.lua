@@ -37,18 +37,30 @@ function Scanner.scan(callbacks, pos0, scan_length)
     -- the scan length.
     local max_steps = scan_length * 4 + 8
     local steps = 0
+    local last_start -- where the last scanned character starts
     while #chars < scan_length and steps < max_steps do
         steps = steps + 1
         local next_pos = callbacks.get_next_char_pos(current)
         if not next_pos or next_pos == current then
             break
         end
-        if not (skip_ruby and Scanner.isRubyAnnotation(current)) then
-            local text = callbacks.get_text_in_range(current, next_pos)
-            if not text or text == "" or text:find("[\r\n]") then
-                -- End of the paragraph: nothing can match across it.
+        local text = callbacks.get_text_in_range(current, next_pos)
+        if not text or text:find("[\r\n]") then
+            -- End of the paragraph: nothing can match across it.
+            break
+        end
+        if text == "" then
+            -- From the end of a text node to the start of the next one: an
+            -- inline element boundary (such as <ruby>) or the end of the
+            -- paragraph, which a range reaching into the next text shows as
+            -- a newline.
+            local after = last_start and callbacks.get_next_char_pos(next_pos)
+            local span = after and callbacks.get_text_in_range(last_start, after)
+            if span and span:find("[\r\n]") then
                 break
             end
+        elseif not (skip_ruby and Scanner.isRubyAnnotation(current)) then
+            last_start = current
             for _, c in ipairs(UString.chars(text)) do
                 if #chars >= scan_length then break end
                 table.insert(chars, c)
