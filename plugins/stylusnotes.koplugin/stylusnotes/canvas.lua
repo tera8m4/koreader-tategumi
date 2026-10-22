@@ -53,7 +53,7 @@ end
 local NoteCanvas = InputContainer:extend{
     title = nil,
     note = nil, -- stored note to edit, or nil for a new one
-    radius = 2,
+    radius = 2, -- device pixels, picked by the user -- unscaled_size_check: ignore
     on_save = nil, -- function(note)
     extra_buttons = nil, -- optional row of buttons, called with the canvas closed
     covers_fullscreen = true,
