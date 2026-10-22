@@ -467,7 +467,8 @@ end
 --[[--
 Register a callback for stylus/pen events.
 Called before gesture detection with fully processed slot data.
-The callback receives the Input object and a slot table: {slot, id, x, y, tool, timev}.
+The callback receives the Input object and a copy of the slot table: {slot, id, x, y, tool, pressure, timev}.
+Coordinates are raw (unrotated); use Input:stylusToScreen to translate them.
 Return true from the callback to dominate the event and remove it from gesture detection.
 ]]
 function Input:registerStylusCallback(callback)
@@ -498,24 +499,33 @@ function Input:routeStylusEvents()
             or (self.pen_slot and slot.slot == self.pen_slot)
 
         if is_stylus then
-            if slot.tool == TOOL_TYPE_PEN then
+            -- Rewrite the tool on a copy: the slot is persistent state in ev_slots,
+            -- and the barrel buttons only apply while held.
+            local routed = {}
+            for k, v in pairs(slot) do
+                routed[k] = v
+            end
+            if routed.tool == TOOL_TYPE_PEN then
                 if self.stylus_eraser_active then
-                    slot.tool = TOOL_TYPE_ERASER
+                    routed.tool = TOOL_TYPE_ERASER
                 elseif self.stylus_highlighter_active then
-                    slot.tool = TOOL_TYPE_HIGHLIGHTER
+                    routed.tool = TOOL_TYPE_HIGHLIGHTER
                 end
             end
 
-            logger.dbg("Input:routeStylusEvents: stylus detected in slot", slot.slot,
-                       "tool=", slot.tool, "id=", slot.id, "x=", slot.x, "y=", slot.y,
-                       "pen_slot=", self.pen_slot, "eraser=", self.stylus_eraser_active,
-                       "highlighter=", self.stylus_highlighter_active)
-            local dominated = self.stylus_callback(self, slot)
+            logger.dbg("Input:routeStylusEvents: stylus detected in slot", routed.slot,
+                       "tool=", routed.tool, "id=", routed.id, "x=", routed.x, "y=", routed.y,
+                       "pressure=", routed.pressure, "pen_slot=", self.pen_slot,
+                       "eraser=", self.stylus_eraser_active, "highlighter=", self.stylus_highlighter_active)
+            local dominated = self.stylus_callback(self, routed)
             if dominated then
                 table.insert(dominated_indices, i)
-                logger.dbg("Input:routeStylusEvents: slot", slot.slot,
+                logger.dbg("Input:routeStylusEvents: slot", routed.slot,
                            "dominated, will remove from gesture detection")
             end
+        elseif self.stylus_palm_rejection and self.stylus_in_proximity then
+            -- Palm rejection: drop finger contacts while the pen is near the screen.
+            table.insert(dominated_indices, i)
         end
     end
 
@@ -764,6 +774,7 @@ function Input:handleKeyBoardEv(ev)
     if stylus_tool_protocol and (ev.code == C.BTN_TOOL_PEN or ev.code == C.BTN_TOOL_RUBBER) then
         -- Switch to the dedicated pen slot, and make sure it's active, as this can come in a dedicated input frame.
         self:setupSlotData(self.pen_slot)
+        self.stylus_in_proximity = ev.value == 1
         if ev.value == 1 then
             self:setCurrentMtSlot("tool", ev.code == C.BTN_TOOL_RUBBER and TOOL_TYPE_ERASER or TOOL_TYPE_PEN)
         else
@@ -777,7 +788,7 @@ function Input:handleKeyBoardEv(ev)
         if ev.code == C.BTN_TOUCH then
             -- BTN_TOUCH is bracketed by BTN_TOOL_PEN/BTN_TOOL_RUBBER, so we can limit this to styluses, to avoid stomping on panel slots.
             local tool = self:getCurrentMtSlotData("tool")
-            if tool == TOOL_TYPE_PEN or tool == TOOL_TYPE_ERASER then
+            if tool == TOOL_TYPE_PEN or tool == TOOL_TYPE_ERASER or tool == TOOL_TYPE_HIGHLIGHTER then
                 -- Make sure the pen slot is active, as this can come in a dedicated input frame
                 -- (i.e., we need it to be referenced by self.MTSlots for the lift to be picked up in the EV_SYN:SYN_REPORT handler).
                 -- (Conversely, getCurrentMtSlotData pokes at the *persistent* slot data in self.ev_slots,
@@ -1091,6 +1102,10 @@ function Input:handleTouchEv(ev)
             if self:getCurrentMtSlotData("tool") == TOOL_TYPE_PEN then
                 self:setCurrentMtSlot("id", -1)
             end
+        elseif ev.code == C.ABS_PRESSURE and self.wacom_protocol and self.cur_slot == self.pen_slot
+            and not (ev.fd and self.rotation_fds and self.rotation_fds[ev.fd]) then
+            -- Keep pen pressure for stylus consumers (raw digitizer units)
+            self:setCurrentMtSlotChecked("pressure", ev.value)
         end
     elseif ev.type == C.EV_SYN then
         if ev.code == C.SYN_REPORT then
@@ -1945,6 +1960,23 @@ function Input:inhibitInputUntil(set_or_seconds)
     end
     UIManager:scheduleIn(delay_s, self._inhibitInputUntil_func)
     self:inhibitInput(true)
+end
+
+--[[--
+Translate raw stylus slot coordinates to screen coordinates for the current rotation
+(the same transform GestureDetector applies to gestures).
+--]]
+function Input:stylusToScreen(x, y)
+    local screen = self.device.screen
+    local mode = screen:getTouchRotation()
+    if mode == screen.DEVICE_ROTATED_CLOCKWISE then
+        return screen:getWidth() - y, x
+    elseif mode == screen.DEVICE_ROTATED_COUNTER_CLOCKWISE then
+        return y, screen:getHeight() - x
+    elseif mode == screen.DEVICE_ROTATED_UPSIDE_DOWN then
+        return screen:getWidth() - x, screen:getHeight() - y
+    end
+    return x, y
 end
 
 Input.TOOL_TYPE_FINGER = TOOL_TYPE_FINGER

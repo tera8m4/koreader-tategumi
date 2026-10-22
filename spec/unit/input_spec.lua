@@ -177,6 +177,48 @@ Event: time 1510346969.076908, -------------- SYN_REPORT ------------
             Input.MTSlots = old_slots
         end)
 
+        it("rewrites the tool for held barrel buttons without changing slot state", function()
+            local pen = { slot = Input.pen_slot, id = Input.pen_slot, x = 1, y = 2, tool = Input.TOOL_TYPE_PEN }
+            local routed
+            withInputState({
+                MTSlots = { pen },
+                stylus_callback = function(_, slot) routed = slot return true end,
+                stylus_eraser_active = true,
+            }, function()
+                Input:routeStylusEvents()
+            end)
+
+            assert.is_equal(Input.TOOL_TYPE_ERASER, routed.tool)
+            assert.is_equal(Input.TOOL_TYPE_PEN, pen.tool)
+        end)
+
+        it("drops finger slots while the pen is in proximity with palm rejection", function()
+            withInputState({
+                MTSlots = {
+                    { slot = Input.main_finger_slot, id = 1, x = 5, y = 5, tool = Input.TOOL_TYPE_FINGER },
+                },
+                stylus_callback = function() return true end,
+                stylus_palm_rejection = true,
+                stylus_in_proximity = true,
+            }, function()
+                Input:routeStylusEvents()
+                assert.is_equal(0, #Input.MTSlots)
+            end)
+        end)
+
+        it("records pen pressure with the wacom protocol", function()
+            withInputState({
+                active_slots = { [Input.pen_slot] = true },
+                cur_slot = Input.pen_slot,
+                ev_slots = { [Input.pen_slot] = { slot = Input.pen_slot } },
+                MTSlots = {},
+                wacom_protocol = true,
+            }, function()
+                Input:handleTouchEv({ type = C.EV_ABS, code = C.ABS_PRESSURE, value = 1234 })
+                assert.is_equal(1234, Input.ev_slots[Input.pen_slot].pressure)
+            end)
+        end)
+
         it("does not turn SDL pen side buttons into eraser tool selectors", function()
             local old_device = Input.device
             local old_event_map = Input.event_map
