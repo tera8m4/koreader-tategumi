@@ -13,6 +13,7 @@ local order = {
     navi = {
         "table_of_contents",
         "bookmarks",
+        "stylusnotes",
         "toggle_bookmark", -- if not Device:isTouchDevice() and not useDPadAsActionKeys()
         "bookmark_browsing_mode",
         "navi_settings",

@@ -1321,6 +1321,10 @@ function ReaderHighlight:showChooseHighlightDialog(highlights)
 end
 
 function ReaderHighlight:showHighlightNoteOrDialog(index)
+    -- Plugins may show their own note view (e.g., handwritten notes).
+    if self.ui:handleEvent(Event:new("ShowHighlightNote", index)) then
+        return
+    end
     local anno = self.ui.annotation.annotations[index]
     local bookmark_note = anno.note
     if bookmark_note then
@@ -1514,6 +1518,14 @@ function ReaderHighlight:showHighlightDialog(index)
             },
         },
     }
+    -- Let plugins add a row of buttons (e.g., handwritten notes).
+    local plugin_row = {}
+    self.ui:handleEvent(Event:new("HighlightDialogButtons", plugin_row, index, function()
+        UIManager:close(edit_highlight_dialog)
+    end))
+    if #plugin_row > 0 then
+        table.insert(buttons, 2, plugin_row)
+    end
     edit_highlight_dialog = ButtonDialog:new{
         name = "edit_highlight_dialog", -- for unit tests
         buttons = buttons,

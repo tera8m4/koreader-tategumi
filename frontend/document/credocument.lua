@@ -917,6 +917,22 @@ function CreDocument:getPageFromXPointer(xp)
     return self._document:getPageFromXPointer(xp)
 end
 
+-- Nearest text xpointer for a screen point (margins snap to the nearest line).
+function CreDocument:getXPointerFromScreenPoint(x, y)
+    return self._document:getXPointerFromScreenPoint(x, y)
+end
+
+-- Line box, glyph extent and font size at xp, in logical document coordinates
+-- (inline/block axes), or nil.
+function CreDocument:getXPointerLineMetrics(xp)
+    return self._document:getXPointerLineMetrics(xp)
+end
+
+-- Screen point for a document point, or nil when it is off the current page.
+function CreDocument:docToScreenPoint(doc_y, doc_x)
+    return self._document:docToScreenPoint(doc_y, doc_x)
+end
+
 function CreDocument:getPageOffsetX(page)
     return self._document:getPageOffsetX(page)
 end
@@ -1978,6 +1994,7 @@ function CreDocument:setupCallCache()
             elseif name == "getTotalPagesLeft" then no_wrap = true
             elseif name == "getDocumentRenderingHash" then no_wrap = true
             elseif name == "getPartialRerenderingsCount" then no_wrap = true
+            elseif name == "getXPointerLineMetrics" then no_wrap = true
 
             -- Some get* have different results by page/pos
             elseif name == "getLinkFromPosition" then cache_by_tag = true
@@ -1985,6 +2002,7 @@ function CreDocument:setupCallCache()
             elseif name == "getScreenBoxesFromPositions" then cache_by_tag = true
             elseif name == "getScreenPositionFromXPointer" then cache_by_tag = true
             elseif name == "getNearestWordFromPosition" then cache_by_tag = true
+            elseif name == "getXPointerFromScreenPoint" then cache_by_tag = true
             elseif name == "getXPointer" then cache_by_tag = true
             elseif name == "getEPubCFI" then cache_by_tag = true
             elseif name == "isXPointerInCurrentPage" then cache_by_tag = true
